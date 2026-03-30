@@ -1,14 +1,14 @@
 import os
-import asyncio
 import pytz
 from datetime import datetime
 from telethon import TelegramClient, events
+from telethon.sessions import StringSession
 
 API_ID = int(os.getenv("API_ID"))
 API_HASH = os.getenv("API_HASH")
 SESSION = os.getenv("SESSION")
 
-client = TelegramClient(SESSION, API_ID, API_HASH)
+client = TelegramClient(StringSession(SESSION), API_ID, API_HASH)
 
 wib = pytz.timezone("Asia/Jakarta")
 
