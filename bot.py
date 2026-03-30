@@ -4,18 +4,18 @@ from datetime import datetime
 from telethon import TelegramClient, events
 from telethon.sessions import StringSession
 
-API_ID = int(os.getenv("API_ID"))
-API_HASH = os.getenv("API_HASH")
-SESSION = os.getenv("SESSION")
+api_id = int(os.getenv("API_ID"))
+api_hash = os.getenv("API_HASH")
+session = os.getenv("SESSION")
 
-client = TelegramClient(StringSession(SESSION), API_ID, API_HASH)
+client = TelegramClient(StringSession(session), api_id, api_hash)
 
 wib = pytz.timezone("Asia/Jakarta")
 
 
-async def hitung_pesan(chat_id, user_id):
-    now = datetime.now(wib)
+async def hitung(chat_id, user_id):
 
+    now = datetime.now(wib)
     start = now.replace(hour=0, minute=0, second=0, microsecond=0)
 
     total = 0
@@ -31,43 +31,21 @@ async def hitung_pesan(chat_id, user_id):
     return total
 
 
-@client.on(events.NewMessage(pattern=r"/itungkata ?(.*)"))
+@client.on(events.NewMessage(pattern="/itungkata"))
 async def handler(event):
 
-    chat = await event.get_chat()
-
-    target = event.pattern_match.group(1)
-
-    if not target:
-
-        await event.reply("contoh:\n/itungkata @username")
+    if not event.is_reply:
+        await event.reply("reply pesan user")
         return
 
-    try:
+    msg = await event.get_reply_message()
 
-        user = await client.get_entity(target)
+    total = await hitung(event.chat_id, msg.sender_id)
 
-    except:
-        await event.reply("username tidak ditemukan")
-        return
-
-    total = await hitung_pesan(chat.id, user.id)
-
-    await event.reply(
-        f"""📊 HITUNG PESAN
-
-User : {user.first_name}
-Username : @{user.username}
-
-Pesan hari ini :
-{total}
-
-⏰ dihitung dari 00:00 WIB"""
-    )
+    await event.reply(f"Total pesan hari ini: {total}")
 
 
-print("BOT AKTIF...")
+print("BOT AKTIF")
 
 client.start()
-
 client.run_until_disconnected()
