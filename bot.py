@@ -2,10 +2,9 @@ from telethon import TelegramClient, events
 from telethon.sessions import StringSession
 import os
 
-# ambil dari environment variable
 API_ID = int(os.getenv("API_ID"))
 API_HASH = os.getenv("API_HASH")
-STRING_SESSION = os.getenv("STRING_SESSION")
+STRING_SESSION = os.getenv("SESSION")
 
 client = TelegramClient(StringSession(STRING_SESSION), API_ID, API_HASH)
 
