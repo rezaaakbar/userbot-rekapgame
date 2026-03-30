@@ -2,6 +2,7 @@ import os
 import asyncio
 import pytz
 from telethon import TelegramClient, events
+from telethon.sessions import StringSession
 from datetime import datetime
 from flask import Flask
 import threading
