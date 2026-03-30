@@ -1,84 +1,55 @@
 import os
 import asyncio
-import pytz
 from telethon import TelegramClient, events
 from telethon.sessions import StringSession
-from datetime import datetime
-from flask import Flask
-import threading
 
+# ambil env
 api_id = int(os.getenv("API_ID"))
 api_hash = os.getenv("API_HASH")
 session = os.getenv("SESSION")
 
+# buat event loop (fix python 3.14)
+loop = asyncio.new_event_loop()
+asyncio.set_event_loop(loop)
+
+# client
 client = TelegramClient(StringSession(session), api_id, api_hash)
 
-# penyimpanan hitungan sementara
-user_messages = {}
-
-# zona waktu WIB
-wib = pytz.timezone("Asia/Jakarta")
-
-# reset setiap 00:00
-async def reset_loop():
-    global user_messages
-    while True:
-        now = datetime.now(wib)
-        if now.hour == 0 and now.minute == 0:
-            user_messages = {}
-            print("RESET DATA HARIAN")
-            await asyncio.sleep(60)
-        await asyncio.sleep(10)
+# penyimpanan pesan
+data = {}
 
 @client.on(events.NewMessage)
-async def handler(event):
-    if event.message.text.startswith("/"):
+async def count(event):
+
+    if event.text.startswith("/"):
         return
 
-    sender = await event.get_sender()
-    user_id = sender.id
+    uid = event.sender_id
 
-    if user_id not in user_messages:
-        user_messages[user_id] = 0
+    if uid not in data:
+        data[uid] = 0
 
-    user_messages[user_id] += 1
+    data[uid] += 1
 
-@client.on(events.MessageDeleted)
-async def deleted(event):
-    # pesan dihapus tidak dihitung
-    pass
 
-@client.on(events.NewMessage(pattern="/rank"))
-async def rank(event):
-    text = "📊 Ranking Pesan Hari Ini\n\n"
+@client.on(events.NewMessage(pattern="/itungkata"))
+async def cek(event):
 
-    sorted_users = sorted(user_messages.items(), key=lambda x: x[1], reverse=True)
+    if not event.is_reply:
+        await event.reply("reply pesan user")
+        return
 
-    for i, (user, count) in enumerate(sorted_users[:10], 1):
-        text += f"{i}. {user} - {count} pesan\n"
+    msg = await event.get_reply_message()
+    uid = msg.sender_id
 
-    await event.reply(text)
+    total = data.get(uid, 0)
 
-# web server supaya render tidak mati
-app = Flask("")
+    await event.reply(f"total pesan hari ini: {total}")
 
-@app.route("/")
-def home():
-    return "Bot aktif"
-
-def run():
-    app.run(host="0.0.0.0", port=10000)
-
-def keep_alive():
-    t = threading.Thread(target=run)
-    t.start()
 
 async def main():
-    keep_alive()
-    asyncio.create_task(reset_loop())
     await client.start()
-    print("Userbot aktif")
+    print("BOT AKTIF")
     await client.run_until_disconnected()
 
-with client:
-    client.loop.run_until_complete(main())
+loop.run_until_complete(main())
