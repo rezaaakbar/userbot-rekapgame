@@ -1,72 +1,57 @@
+import asyncio
+import os
 from telethon import TelegramClient, events
-from datetime import datetime, timedelta, timezone
+from dotenv import load_dotenv
 
-# ================= API =================
-api_id = 35841167
-api_hash = "1ed1822dd3d2c98da0b56d6a890e48d3"
+# ambil data dari .env
+load_dotenv()
+
+api_id = int(os.getenv("API_ID"))
+api_hash = os.getenv("API_HASH")
+phone = os.getenv("PHONE")
 
 client = TelegramClient("session", api_id, api_hash)
 
-# ================= WIB =================
-WIB = timezone(timedelta(hours=7))
+kata_db = {}
 
-# ================= COMMAND =================
-@client.on(events.NewMessage(pattern=r'^/itungkata (.+)'))
+@client.on(events.NewMessage)
 async def handler(event):
 
-    args = event.pattern_match.group(1).split()
-
-    # kata yang dihitung
-    keyword = args[0].lower()
-
-    # jika ada id grup
-    if len(args) > 1:
-        chat = int(args[1])
-    else:
-        chat = await event.get_chat()
-
-    counts = {}
-    total = 0
-    today = datetime.now(WIB).date()
-
-    async for msg in client.iter_messages(chat, limit=5000):
-
-        if not msg.text:
-            continue
-
-        msg_date = msg.date.astimezone(WIB).date()
-
-        if msg_date != today:
-            continue
-
-        text = msg.text.lower()
-        jumlah = text.count(keyword)
-
-        if jumlah > 0:
-            sender = await msg.get_sender()
-
-            if sender.username:
-                name = f"@{sender.username}"
-            else:
-                name = sender.first_name
-
-            counts[name] = counts.get(name, 0) + jumlah
-            total += jumlah
-
-    if total == 0:
-        await event.reply("❌ kata tidak ditemukan hari ini")
+    if not event.raw_text:
         return
 
-    result = f"📊 Statistik kata **{keyword}** hari ini\n\n"
+    chat_id = event.chat_id
+    text = event.raw_text.lower()
 
-    for user, j in sorted(counts.items(), key=lambda x: x[1], reverse=True):
-        result += f"{user} = {j}\n"
+    if chat_id not in kata_db:
+        kata_db[chat_id] = {}
 
-    result += f"\nTOTAL = {total}"
+    words = text.split()
 
-    await event.reply(result)
+    for w in words:
+        kata_db[chat_id][w] = kata_db[chat_id].get(w, 0) + 1
+
+    if text.startswith("/itungkata"):
+
+        args = text.split()
+
+        if len(args) < 2:
+            await event.reply("contoh:\n/itungkata anjay")
+            return
+
+        word = args[1]
+
+        jumlah = kata_db[chat_id].get(word, 0)
+
+        await event.reply(
+            f"📊 Kata '{word}' sudah dikirim\n"
+            f"➡️ {jumlah} kali di grup ini"
+        )
 
 
-print("Bot berjalan...")
-client.start()
-client.run_until_disconnected()
+async def main():
+    await client.start(phone)
+    print("BOT AKTIF")
+    await client.run_until_disconnected()
+
+asyncio.run(main())
