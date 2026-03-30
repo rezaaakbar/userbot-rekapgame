@@ -1,128 +1,81 @@
-import os
-import threading
+from telethon import TelegramClient, events
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime
 import pytz
 from flask import Flask
-from telethon import TelegramClient, events
-from telethon.sessions import StringSession
+import threading
 
-# =====================
-# WEB SERVER (RENDER)
-# =====================
+api_id = 123456
+api_hash = "ISI_API_HASH_KAMU"
 
-app = Flask(__name__)
+client = TelegramClient("session", api_id, api_hash)
 
-@app.route("/")
-def home():
-    return "Bot running"
+# penyimpanan hitungan sementara
+user_messages = {}
 
-def run_web():
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port)
+# zona waktu WIB
+wib = pytz.timezone("Asia/Jakarta")
 
-threading.Thread(target=run_web).start()
-
-# =====================
-# ENV
-# =====================
-
-API_ID = int(os.getenv("API_ID"))
-API_HASH = os.getenv("API_HASH")
-SESSION = os.getenv("SESSION")
-
-client = TelegramClient(StringSession(SESSION), API_ID, API_HASH)
-
-# =====================
-# DATA RAM
-# =====================
-
-user_words = {}
-message_words = {}
-
-# =====================
-# HITUNG KATA
-# =====================
+# reset setiap 00:00
+async def reset_loop():
+    global user_messages
+    while True:
+        now = datetime.now(wib)
+        if now.hour == 0 and now.minute == 0:
+            user_messages = {}
+            print("RESET DATA HARIAN")
+            await asyncio.sleep(60)
+        await asyncio.sleep(10)
 
 @client.on(events.NewMessage)
-async def count_words(event):
-
-    if event.raw_text.startswith("/"):
+async def handler(event):
+    if event.message.text.startswith("/"):
         return
 
-    user = event.sender_id
-    msg_id = event.id
+    sender = await event.get_sender()
+    user_id = sender.id
 
-    words = len(event.raw_text.split())
+    if user_id not in user_messages:
+        user_messages[user_id] = 0
 
-    user_words[user] = user_words.get(user, 0) + words
-    message_words[msg_id] = (user, words)
-
-# =====================
-# PESAN DIHAPUS
-# =====================
+    user_messages[user_id] += 1
 
 @client.on(events.MessageDeleted)
 async def deleted(event):
+    # pesan dihapus tidak dihitung
+    pass
 
-    for msg_id in event.deleted_ids:
+@client.on(events.NewMessage(pattern="/rank"))
+async def rank(event):
+    text = "📊 Ranking Pesan Hari Ini\n\n"
 
-        if msg_id in message_words:
+    sorted_users = sorted(user_messages.items(), key=lambda x: x[1], reverse=True)
 
-            user, words = message_words[msg_id]
+    for i, (user, count) in enumerate(sorted_users[:10], 1):
+        text += f"{i}. {user} - {count} pesan\n"
 
-            user_words[user] -= words
+    await event.reply(text)
 
-            del message_words[msg_id]
+# web server supaya render tidak mati
+app = Flask("")
 
-# =====================
-# CEK JUMLAH KATA
-# =====================
+@app.route("/")
+def home():
+    return "Bot aktif"
 
-@client.on(events.NewMessage(pattern="/itungkata"))
-async def check_words(event):
+def run():
+    app.run(host="0.0.0.0", port=10000)
 
-    total = user_words.get(event.sender_id, 0)
-
-    await event.reply(f"Total kata kamu hari ini: {total}")
-
-# =====================
-# RESET 00:00 WIB
-# =====================
-
-async def reset_midnight():
-
-    global user_words, message_words
-
-    tz = pytz.timezone("Asia/Jakarta")
-
-    while True:
-
-        now = datetime.now(tz)
-
-        tomorrow = now.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
-
-        wait = (tomorrow - now).total_seconds()
-
-        await asyncio.sleep(wait)
-
-        user_words = {}
-        message_words = {}
-
-        print("Reset harian 00:00 WIB")
-
-# =====================
-# RUN
-# =====================
+def keep_alive():
+    t = threading.Thread(target=run)
+    t.start()
 
 async def main():
-
+    keep_alive()
+    asyncio.create_task(reset_loop())
     await client.start()
-
-    asyncio.create_task(reset_midnight())
-
-    print("Bot berjalan")
-
+    print("Userbot aktif")
     await client.run_until_disconnected()
 
-asyncio.run(main())
+with client:
+    client.loop.run_until_complete(main())
