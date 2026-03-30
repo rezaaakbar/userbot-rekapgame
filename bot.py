@@ -1,14 +1,13 @@
-from telethon import TelegramClient, events
+import os
 import asyncio
-from datetime import datetime
-import pytz
-from flask import Flask
-import threading
+from telethon import TelegramClient
+from telethon.sessions import StringSession
 
-api_id = 123456
-api_hash = "ISI_API_HASH_KAMU"
+api_id = int(os.getenv("API_ID"))
+api_hash = os.getenv("API_HASH")
+session = os.getenv("SESSION")
 
-client = TelegramClient("session", api_id, api_hash)
+client = TelegramClient(StringSession(session), api_id, api_hash)
 
 # penyimpanan hitungan sementara
 user_messages = {}
