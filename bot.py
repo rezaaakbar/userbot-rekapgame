@@ -1,4 +1,5 @@
 import os
+import asyncio
 import pytz
 from datetime import datetime
 from telethon import TelegramClient, events
@@ -14,14 +15,12 @@ wib = pytz.timezone("Asia/Jakarta")
 
 
 async def hitung(chat_id, user_id):
-
     now = datetime.now(wib)
     start = now.replace(hour=0, minute=0, second=0, microsecond=0)
 
     total = 0
 
     async for msg in client.iter_messages(chat_id):
-
         if msg.date.astimezone(wib) < start:
             break
 
@@ -35,7 +34,7 @@ async def hitung(chat_id, user_id):
 async def handler(event):
 
     if not event.is_reply:
-        await event.reply("reply pesan user")
+        await event.reply("Reply pesan user dulu.")
         return
 
     msg = await event.get_reply_message()
@@ -45,7 +44,10 @@ async def handler(event):
     await event.reply(f"Total pesan hari ini: {total}")
 
 
-print("BOT AKTIF")
+async def main():
+    print("BOT AKTIF")
+    await client.start()
+    await client.run_until_disconnected()
 
-client.start()
-client.run_until_disconnected()
+
+asyncio.run(main())
