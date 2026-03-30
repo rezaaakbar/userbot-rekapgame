@@ -51,7 +51,11 @@ async def hitung(event):
     await event.reply(text)
 
 
-print("Bot berjalan...")
+import asyncio
 
-client.start()
-client.run_until_disconnected()
+async def main():
+    print("Bot berjalan...")
+    await client.start()
+    await client.run_until_disconnected()
+
+asyncio.run(main())
