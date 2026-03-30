@@ -1,71 +1,73 @@
 import os
 import asyncio
+import pytz
+from datetime import datetime
 from telethon import TelegramClient, events
-from telethon.sessions import StringSession
-from flask import Flask
-import threading
 
-# env
-api_id = int(os.getenv("API_ID"))
-api_hash = os.getenv("API_HASH")
-session = os.getenv("SESSION")
+API_ID = int(os.getenv("API_ID"))
+API_HASH = os.getenv("API_HASH")
+SESSION = os.getenv("SESSION")
 
-# telegram client
-client = TelegramClient(StringSession(session), api_id, api_hash)
+client = TelegramClient(SESSION, API_ID, API_HASH)
 
-# penyimpanan pesan
-data = {}
+wib = pytz.timezone("Asia/Jakarta")
 
-@client.on(events.NewMessage)
-async def count(event):
 
-    if not event.text:
+async def hitung_pesan(chat_id, user_id):
+    now = datetime.now(wib)
+
+    start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+
+    total = 0
+
+    async for msg in client.iter_messages(chat_id):
+
+        if msg.date.astimezone(wib) < start:
+            break
+
+        if msg.sender_id == user_id:
+            total += 1
+
+    return total
+
+
+@client.on(events.NewMessage(pattern=r"/itungkata ?(.*)"))
+async def handler(event):
+
+    chat = await event.get_chat()
+
+    target = event.pattern_match.group(1)
+
+    if not target:
+
+        await event.reply("contoh:\n/itungkata @username")
         return
 
-    if event.text.startswith("/"):
+    try:
+
+        user = await client.get_entity(target)
+
+    except:
+        await event.reply("username tidak ditemukan")
         return
 
-    uid = event.sender_id
-    data[uid] = data.get(uid, 0) + 1
+    total = await hitung_pesan(chat.id, user.id)
+
+    await event.reply(
+        f"""📊 HITUNG PESAN
+
+User : {user.first_name}
+Username : @{user.username}
+
+Pesan hari ini :
+{total}
+
+⏰ dihitung dari 00:00 WIB"""
+    )
 
 
-@client.on(events.NewMessage(pattern="/itungkata"))
-async def cek(event):
+print("BOT AKTIF...")
 
-    if not event.is_reply:
-        await event.reply("reply pesan user")
-        return
+client.start()
 
-    msg = await event.get_reply_message()
-    uid = msg.sender_id
-    total = data.get(uid, 0)
-
-    await event.reply(f"total pesan hari ini: {total}")
-
-
-# ===== server kecil supaya render detect port =====
-
-app = Flask(__name__)
-
-@app.route("/")
-def home():
-    return "bot hidup"
-
-def run_web():
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port)
-
-# ===== main =====
-
-async def main():
-    await client.start()
-    print("BOT AKTIF")
-    await client.run_until_disconnected()
-
-
-def start():
-    threading.Thread(target=run_web).start()
-    asyncio.run(main())
-
-
-start()
+client.run_until_disconnected()
