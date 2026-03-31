@@ -1,24 +1,18 @@
 import os
-import json
-import pytz
-import asyncio
 from datetime import datetime
+from collections import defaultdict
 from telethon import TelegramClient, events
 from telethon.sessions import StringSession
 from flask import Flask
 from threading import Thread
 
-# ================= CONFIG =================
-
 API_ID = int(os.getenv("API_ID"))
 API_HASH = os.getenv("API_HASH")
 SESSION = os.getenv("SESSION")
 
-# ================= TELETHON =================
-
 client = TelegramClient(StringSession(SESSION), API_ID, API_HASH)
 
-# ================= WEB SERVER (RENDER) =================
+# ================= WEB SERVER =================
 
 app = Flask(__name__)
 
@@ -30,74 +24,46 @@ def run_web():
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
 
-# ================= DATA =================
-
-DATA_FILE = "data.json"
-wib = pytz.timezone("Asia/Jakarta")
-
-if not os.path.exists(DATA_FILE):
-    with open(DATA_FILE, "w") as f:
-        json.dump({"date": "", "users": {}}, f)
-
-def load_data():
-    with open(DATA_FILE) as f:
-        return json.load(f)
-
-def save_data(data):
-    with open(DATA_FILE, "w") as f:
-        json.dump(data, f)
-
-def reset_if_new_day():
-    data = load_data()
-    today = datetime.now(wib).strftime("%Y-%m-%d")
-
-    if data["date"] != today:
-        data["date"] = today
-        data["users"] = {}
-        save_data(data)
-
-# ================= HITUNG PESAN =================
-
-@client.on(events.NewMessage)
-async def count_message(event):
-
-    if not event.is_group:
-        return
-
-    reset_if_new_day()
-
-    data = load_data()
-    user = str(event.sender_id)
-
-    if user not in data["users"]:
-        data["users"][user] = 0
-
-    data["users"][user] += 1
-
-    save_data(data)
-
-# ================= COMMAND =================
+# ================= REKAP =================
 
 @client.on(events.NewMessage(pattern="/rekap"))
 async def rekap(event):
 
-    data = load_data()
+    if not event.is_group:
+        return
 
-    if not data["users"]:
+    chat = await event.get_chat()
+
+    now = datetime.now()
+    start_day = datetime(now.year, now.month, now.day)
+
+    counts = defaultdict(int)
+
+    async for msg in client.iter_messages(chat.id):
+
+        if msg.date.replace(tzinfo=None) < start_day:
+            break
+
+        if msg.sender_id:
+            counts[msg.sender_id] += 1
+
+    if not counts:
         await event.reply("📊 Belum ada pesan hari ini")
         return
 
     text = "📊 Rekap Pesan Hari Ini\n\n"
 
-    for uid, jumlah in data["users"].items():
+    sorted_users = sorted(counts.items(), key=lambda x: x[1], reverse=True)
+
+    for uid, total in sorted_users:
 
         try:
-            user = await client.get_entity(int(uid))
+            user = await client.get_entity(uid)
             name = user.first_name
         except:
             name = "User"
 
-        text += f"{name} : {jumlah} pesan\n"
+        text += f"{name} : {total} pesan\n"
 
     await event.reply(text)
 
@@ -108,13 +74,8 @@ async def main():
     print("BOT TELEGRAM AKTIF")
     await client.run_until_disconnected()
 
-# ================= START =================
-
 if __name__ == "__main__":
 
     Thread(target=run_web).start()
 
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-
-    loop.run_until_complete(main())
+    client.loop.run_until_complete(main())
