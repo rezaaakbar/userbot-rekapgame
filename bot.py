@@ -33,6 +33,11 @@ async def rekap(event):
 
     kata = args[0].lower()
 
+    if len(args) >= 2:
+        chat_id = int(args[1])
+    else:
+        chat_id = event.chat_id
+
     # ===== jika dipakai di privat =====
     if not event.is_group:
 
@@ -52,14 +57,19 @@ async def rekap(event):
 
     counts = defaultdict(int)
 
-    async for msg in client.iter_messages(chat.id):
+    async for msg in client.iter_messages(chat):
 
-        if msg.date < start_day:
-            break
+    if msg.date < start_day:
+        break
 
-        if msg.text and kata in msg.text.lower():
-            if msg.sender_id:
-                counts[msg.sender_id] += 1
+    if msg.text and msg.text.startswith("/"):
+        continue
+
+    if kata not in msg.text.lower():
+        continue
+
+    if msg.sender_id:
+        counts[msg.sender_id] += 1
 
     today = datetime.now(wib).strftime("%d %B %Y")
 
