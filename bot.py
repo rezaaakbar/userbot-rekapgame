@@ -8,9 +8,15 @@ from telethon.sessions import StringSession
 from flask import Flask
 from threading import Thread
 
-API_ID = int(os.getenv("API_ID"))
+API_ID = os.getenv("API_ID")
 API_HASH = os.getenv("API_HASH")
 SESSION = os.getenv("SESSION")
+
+if not API_ID or not API_HASH or not SESSION:
+    print("ENV VARIABLE BELUM DIISI!")
+    exit()
+
+API_ID = int(API_ID)
 
 client = TelegramClient(StringSession(SESSION), API_ID, API_HASH)
 
@@ -34,7 +40,7 @@ if not os.path.exists(DATA_FILE):
 
 
 def load_data():
-    with open(DATA_FILE, "r") as f:
+    with open(DATA_FILE) as f:
         return json.load(f)
 
 
@@ -68,7 +74,6 @@ async def count_message(event):
         data["users"][user_id] = 0
 
     data["users"][user_id] += 1
-
     save_data(data)
 
 
@@ -98,7 +103,7 @@ async def rekap(event):
 
 async def main():
     await client.start()
-    print("USERBOT BERJALAN...")
+    print("BOT TELEGRAM AKTIF")
     await client.run_until_disconnected()
 
 
