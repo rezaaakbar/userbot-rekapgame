@@ -103,7 +103,11 @@ async def rekap(event):
     await event.reply(text)
 
 
-print("USERBOT BERJALAN...")
+import asyncio
 
-client.start()
-client.run_until_disconnected()
+async def main():
+    await client.start()
+    print("USERBOT BERJALAN...")
+    await client.run_until_disconnected()
+
+asyncio.run(main())
