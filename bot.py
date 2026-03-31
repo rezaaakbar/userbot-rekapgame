@@ -150,18 +150,20 @@ async def rekapkata7(event):
     start_text = start_day.strftime("%d %B %Y")
 end_text = now.strftime("%d %B %Y")
 
-    text = (
-    "📊 JUMLAH PESAN 7 HARI TERAKHIR\n"
-    f"📅 {start_text} - {end_text}\n\n"
-    f"📝 PESAN YG DI CARI: {kata}\n\n"
-    "👤 USER YG MENGIRIM:\n\n"
-    )
+text = (
+"📊 JUMLAH PESAN 7 HARI TERAKHIR\n"
+f"📅 {start_text} - {end_text}\n\n"
+f"📝 PESAN YG DI CARI: {kata}\n\n"
+"👤 USER YG MENGIRIM:\n\n"
+)
+
+total = 0
+
+for user_id, jumlah in sorted(counts.items(), key=lambda x: x[1], reverse=True):
+
+    user = await client.get_entity(user_id)
 
     total = 0
-
-    for user_id, jumlah in sorted(counts.items(), key=lambda x: x[1], reverse=True):
-
-        user = await client.get_entity(user_id)
 
         username = f"@{user.username}" if user.username else user.first_name
 
