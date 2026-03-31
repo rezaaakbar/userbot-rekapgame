@@ -26,7 +26,7 @@ def run_web():
 
 # ================= REKAP =================
 
-@client.on(events.NewMessage(pattern=r"/rekap (.+)"))
+@client.on(events.NewMessage(pattern=r"/rekapkata (.+)"))
 async def rekap(event):
 
     if not event.is_group:
