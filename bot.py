@@ -26,12 +26,13 @@ def run_web():
 
 # ================= REKAP =================
 
-@client.on(events.NewMessage(pattern="/rekap"))
+@client.on(events.NewMessage(pattern=r"/rekap (.+)"))
 async def rekap(event):
 
     if not event.is_group:
         return
 
+    kata = event.pattern_match.group(1).lower()
     chat = await event.get_chat()
 
     now = datetime.now()
@@ -44,26 +45,32 @@ async def rekap(event):
         if msg.date.replace(tzinfo=None) < start_day:
             break
 
-        if msg.sender_id:
-            counts[msg.sender_id] += 1
+        if msg.text and kata in msg.text.lower():
+            if msg.sender_id:
+                counts[msg.sender_id] += 1
 
-    if not counts:
-        await event.reply("📊 Belum ada pesan hari ini")
-        return
+    today = datetime.now().strftime("%d %B %Y")
 
-    text = "📊 Rekap Pesan Hari Ini\n\n"
+    text = (
+        "📊𝗝𝗨𝗠𝗟𝗔𝗛 𝗣𝗘𝗦𝗔𝗡 𝗛𝗔𝗥𝗜 𝗜𝗡𝗜\n"
+        f"🗓️ {today}\n\n"
+        f"📝𝗣𝗘𝗦𝗔𝗡 𝗬𝗚 𝗗𝗜 𝗖𝗔𝗥𝗜: {kata}\n"
+    )
 
-    sorted_users = sorted(counts.items(), key=lambda x: x[1], reverse=True)
+    total = 0
 
-    for uid, total in sorted_users:
+    for uid, jumlah in counts.items():
 
         try:
             user = await client.get_entity(uid)
-            name = user.first_name
+            username = f"@{user.username}" if user.username else user.first_name
         except:
-            name = "User"
+            username = "user"
 
-        text += f"{name} : {total} pesan\n"
+        text += f"{username} : {jumlah}\n"
+        total += jumlah
+
+    text += f"\n🏆𝗧𝗢𝗧𝗔𝗟: {total}"
 
     await event.reply(text)
 
