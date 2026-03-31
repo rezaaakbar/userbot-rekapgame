@@ -126,7 +126,7 @@ async def rekapkata7(event):
     wib = timezone(timedelta(hours=7))
     now = datetime.now(wib)
 
-    start_day = now - timedelta(days=7)
+    start_day = datetime(now.year, now.month, now.day, tzinfo=wib) - timedelta(days=6)
 
     counts = defaultdict(int)
 
