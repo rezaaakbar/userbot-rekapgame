@@ -97,6 +97,8 @@ async def rekap(event):
 
     await event.reply(text)
     
+# ================= REKAP7 =================
+
 @client.on(events.NewMessage(pattern=r"/rekapkata7"))
 async def rekapkata7(event):
 
@@ -145,11 +147,12 @@ async def rekapkata7(event):
         if msg.sender_id:
             counts[msg.sender_id] += 1
 
-    today = datetime.now(wib).strftime("%d %B %Y")
+    start_text = start_day.strftime("%d %B %Y")
+end_text = now.strftime("%d %B %Y")
 
     text = (
         f"📊 JUMLAH PESAN 7 HARI TERAKHIR\n"
-        f"📅 {today}\n\n"
+        f"📅 {start_text} - {end_text}\n\n"
         f"📝 PESAN YG DI CARI: {kata}\n\n"
         f"👤 USER YG MENGIRIM:\n\n"
     )
