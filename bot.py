@@ -1,16 +1,18 @@
-import os
+
 import asyncio
-import pytz
-from datetime import datetime
+import os
 from telethon import TelegramClient, events
-from telethon.sessions import StringSession
 
-api_id = int(os.getenv("API_ID"))
-api_hash = os.getenv("API_HASH")
-session = os.getenv("SESSION")
+try:
+    asyncio.get_event_loop()
+except RuntimeError:
+    asyncio.set_event_loop(asyncio.new_event_loop())
 
-client = TelegramClient(StringSession(session), api_id, api_hash)
+API_ID = int(os.getenv("API_ID"))
+API_HASH = os.getenv("API_HASH")
+SESSION = os.getenv("SESSION")
 
+client = TelegramClient(SESSION, API_ID, API_HASH)
 wib = pytz.timezone("Asia/Jakarta")
 
 
