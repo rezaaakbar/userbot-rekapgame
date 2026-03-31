@@ -163,8 +163,6 @@ for user_id, jumlah in sorted(counts.items(), key=lambda x: x[1], reverse=True):
 
     user = await client.get_entity(user_id)
 
-    total = 0
-
         username = f"@{user.username}" if user.username else user.first_name
 
         text += f"{username} : {jumlah}\n"
