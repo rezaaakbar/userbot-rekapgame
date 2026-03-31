@@ -1,5 +1,5 @@
 import os
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from collections import defaultdict
 from telethon import TelegramClient, events
 from telethon.sessions import StringSession
@@ -35,8 +35,9 @@ async def rekap(event):
     kata = event.pattern_match.group(1).lower()
     chat = await event.get_chat()
 
-    now = datetime.now()
-    start_day = datetime(now.year, now.month, now.day)
+    wib = timezone(timedelta(hours=7))
+now = datetime.now(wib)
+start_day = datetime(now.year, now.month, now.day, tzinfo=wib)
 
     counts = defaultdict(int)
 
@@ -52,9 +53,10 @@ async def rekap(event):
     today = datetime.now().strftime("%d %B %Y")
 
     text = (
-        "📊𝗝𝗨𝗠𝗟𝗔𝗛 𝗣𝗘𝗦𝗔𝗡 𝗛𝗔𝗥𝗜 𝗜𝗡𝗜\n"
-        f"🗓️ {today}\n\n"
-        f"📝𝗣𝗘𝗦𝗔𝗡 𝗬𝗚 𝗗𝗜 𝗖𝗔𝗥𝗜: {kata}\n"
+    "📊𝗝𝗨𝗠𝗟𝗔𝗛 𝗣𝗘𝗦𝗔𝗡 𝗛𝗔𝗥𝗜 𝗜𝗡𝗜\n"
+    f"🗓️ {today}\n\n"
+    f"📝𝗣𝗘𝗦𝗔𝗡 𝗬𝗚 𝗗𝗜 𝗖𝗔𝗥𝗜: {kata}\n\n"
+    "👤𝗨𝗦𝗘𝗥 𝗬𝗚 𝗠𝗘𝗡𝗚𝗜𝗥𝗜𝗠:\n\n"
     )
 
     total = 0
