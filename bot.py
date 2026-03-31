@@ -29,11 +29,22 @@ def run_web():
 @client.on(events.NewMessage(pattern=r"/rekapkata (.+)"))
 async def rekap(event):
 
-    if not event.is_group:
-        return
+    args = event.pattern_match.group(1).split()
 
-    kata = event.pattern_match.group(1).lower()
-    chat = await event.get_chat()
+    kata = args[0].lower()
+
+    # ===== jika dipakai di privat =====
+    if not event.is_group:
+
+        if len(args) < 2:
+            await event.reply("Contoh:\n/rekapkata kata -100IDGRUP")
+            return
+
+        group_id = int(args[1])
+        chat = await client.get_entity(group_id)
+
+    else:
+        chat = await event.get_chat()
 
     wib = timezone(timedelta(hours=7))
     now = datetime.now(wib)
@@ -43,20 +54,20 @@ async def rekap(event):
 
     async for msg in client.iter_messages(chat.id):
 
-        if msg.date.replace(tzinfo=None) < start_day:
+        if msg.date < start_day:
             break
 
         if msg.text and kata in msg.text.lower():
             if msg.sender_id:
                 counts[msg.sender_id] += 1
 
-    today = datetime.now().strftime("%d %B %Y")
+    today = datetime.now(wib).strftime("%d %B %Y")
 
     text = (
-    "📊𝗝𝗨𝗠𝗟𝗔𝗛 𝗣𝗘𝗦𝗔𝗡 𝗛𝗔𝗥𝗜 𝗜𝗡𝗜\n"
-    f"🗓️ {today}\n\n"
-    f"📝𝗣𝗘𝗦𝗔𝗡 𝗬𝗚 𝗗𝗜 𝗖𝗔𝗥𝗜: {kata}\n\n"
-    "👤𝗨𝗦𝗘𝗥 𝗬𝗚 𝗠𝗘𝗡𝗚𝗜𝗥𝗜𝗠:\n\n"
+        "📊𝗝𝗨𝗠𝗟𝗔𝗛 𝗣𝗘𝗦𝗔𝗡 𝗛𝗔𝗥𝗜 𝗜𝗡𝗜\n"
+        f"🗓️ {today}\n\n"
+        f"📝𝗣𝗘𝗦𝗔𝗡 𝗬𝗚 𝗗𝗜 𝗖𝗔𝗥𝗜: {kata}\n\n"
+        "👤𝗨𝗦𝗘𝗥 𝗬𝗚 𝗠𝗘𝗡𝗚𝗜𝗥𝗜𝗠:\n\n"
     )
 
     total = 0
