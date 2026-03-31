@@ -159,15 +159,15 @@ f"📝 PESAN YG DI CARI: {kata}\n\n"
 
 total = 0
 
-for user_id, jumlah in sorted(counts.items(), key=lambda x: x[1], reverse=True):
+    for user_id, jumlah in sorted(counts.items(), key=lambda x: x[1], reverse=True):
 
-    user = await client.get_entity(user_id)
+        user = await client.get_entity(user_id)
 
-    username = f"@{user.username}" if user.username else user.first_name
+        username = f"@{user.username}" if user.username else user.first_name
 
-    text += f"{username} : {jumlah}\n"
+        text += f"{username} : {jumlah}\n"
 
-    total += jumlah
+        total += jumlah
 
     await event.reply(text)
 # ================= MAIN =================
