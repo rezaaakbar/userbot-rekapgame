@@ -1,7 +1,7 @@
-
 import asyncio
 import os
 from telethon import TelegramClient, events
+from telethon.sessions import StringSession
 
 try:
     asyncio.get_event_loop()
@@ -12,7 +12,7 @@ API_ID = int(os.getenv("API_ID"))
 API_HASH = os.getenv("API_HASH")
 SESSION = os.getenv("SESSION")
 
-client = TelegramClient(SESSION, API_ID, API_HASH)
+client = TelegramClient(StringSession(SESSION), API_ID, API_HASH)
 wib = pytz.timezone("Asia/Jakarta")
 
 
