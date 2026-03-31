@@ -21,7 +21,7 @@ app = Flask(name)
 
 @app.route("/")
 def home():
-return "Bot aktif"
+    return "Bot aktif"
 
 def run_web():
 port = int(os.environ.get("PORT", 10000))
