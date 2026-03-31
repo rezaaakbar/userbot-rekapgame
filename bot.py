@@ -151,10 +151,10 @@ async def rekapkata7(event):
 end_text = now.strftime("%d %B %Y")
 
     text = (
-        f"📊 JUMLAH PESAN 7 HARI TERAKHIR\n"
-        f"📅 {start_text} - {end_text}\n\n"
-        f"📝 PESAN YG DI CARI: {kata}\n\n"
-        f"👤 USER YG MENGIRIM:\n\n"
+    "📊 JUMLAH PESAN 7 HARI TERAKHIR\n"
+    f"📅 {start_text} - {end_text}\n\n"
+    f"📝 PESAN YG DI CARI: {kata}\n\n"
+    "👤 USER YG MENGIRIM:\n\n"
     )
 
     total = 0
