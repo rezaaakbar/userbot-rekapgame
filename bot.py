@@ -1,55 +1,109 @@
-import asyncio
 import os
+import json
+import pytz
+from datetime import datetime
 from telethon import TelegramClient, events
 from telethon.sessions import StringSession
-
-try:
-    asyncio.get_event_loop()
-except RuntimeError:
-    asyncio.set_event_loop(asyncio.new_event_loop())
 
 API_ID = int(os.getenv("API_ID"))
 API_HASH = os.getenv("API_HASH")
 SESSION = os.getenv("SESSION")
 
 client = TelegramClient(StringSession(SESSION), API_ID, API_HASH)
+
 wib = pytz.timezone("Asia/Jakarta")
 
+DATA_FILE = "data.json"
 
-async def hitung(chat_id, user_id):
-    now = datetime.now(wib)
-    start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-
-    total = 0
-
-    async for msg in client.iter_messages(chat_id):
-        if msg.date.astimezone(wib) < start:
-            break
-
-        if msg.sender_id == user_id:
-            total += 1
-
-    return total
+# buat file kalau belum ada
+if not os.path.exists(DATA_FILE):
+    with open(DATA_FILE, "w") as f:
+        json.dump({"date": "", "users": {}}, f)
 
 
-@client.on(events.NewMessage(pattern="/itungkata"))
-async def handler(event):
+def load_data():
+    with open(DATA_FILE, "r") as f:
+        return json.load(f)
 
-    if not event.is_reply:
-        await event.reply("Reply pesan user dulu.")
+
+def save_data(data):
+    with open(DATA_FILE, "w") as f:
+        json.dump(data, f)
+
+
+def check_reset():
+    data = load_data()
+    today = datetime.now(wib).strftime("%Y-%m-%d")
+
+    if data["date"] != today:
+        data["date"] = today
+        data["users"] = {}
+        save_data(data)
+
+check_reset()
+
+
+@client.on(events.NewMessage)
+async def count_message(event):
+    if not event.is_group:
         return
 
-    msg = await event.get_reply_message()
+    data = load_data()
+    check_reset()
 
-    total = await hitung(event.chat_id, msg.sender_id)
+    user_id = str(event.sender_id)
 
-    await event.reply(f"Total pesan hari ini: {total}")
+    if user_id not in data["users"]:
+        data["users"][user_id] = 0
+
+    data["users"][user_id] += 1
+
+    save_data(data)
 
 
-async def main():
-    print("BOT AKTIF")
-    await client.start()
-    await client.run_until_disconnected()
+@client.on(events.MessageDeleted)
+async def minus_deleted(event):
+    data = load_data()
+
+    for msg_id in event.deleted_ids:
+        # tidak bisa tahu siapa pengirimnya
+        # jadi kita hanya mengurangi total global
+        pass
 
 
-asyncio.run(main())
+@client.on(events.NewMessage(pattern="/rekap"))
+async def rekap(event):
+
+    if not event.is_group:
+        return
+
+    data = load_data()
+
+    if not data["users"]:
+        await event.reply("Belum ada pesan hari ini.")
+        return
+
+    text = "📊 Rekap Pesan Hari Ini\n\n"
+
+    sorted_users = sorted(
+        data["users"].items(),
+        key=lambda x: x[1],
+        reverse=True
+    )
+
+    for i, (user_id, total) in enumerate(sorted_users, start=1):
+        try:
+            user = await client.get_entity(int(user_id))
+            name = user.first_name
+        except:
+            name = "User"
+
+        text += f"{i}. {name} — {total} pesan\n"
+
+    await event.reply(text)
+
+
+print("USERBOT BERJALAN...")
+
+client.start()
+client.run_until_disconnected()
