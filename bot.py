@@ -59,17 +59,17 @@ async def rekap(event):
 
     async for msg in client.iter_messages(chat):
 
-    if msg.date < start_day:
-        break
+        if msg.date < start_day:
+            break
 
-    if msg.text and msg.text.startswith("/"):
-        continue
+        if msg.text and msg.text.startswith("/"):
+            continue
 
-    if kata not in msg.text.lower():
-        continue
+        if kata not in msg.text.lower():
+            continue
 
-    if msg.sender_id:
-        counts[msg.sender_id] += 1
+        if msg.sender_id:
+            counts[msg.sender_id] += 1
 
     today = datetime.now(wib).strftime("%d %B %Y")
 
