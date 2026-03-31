@@ -36,8 +36,8 @@ async def rekap(event):
     chat = await event.get_chat()
 
     wib = timezone(timedelta(hours=7))
-now = datetime.now(wib)
-start_day = datetime(now.year, now.month, now.day, tzinfo=wib)
+    now = datetime.now(wib)
+    start_day = datetime(now.year, now.month, now.day, tzinfo=wib)
 
     counts = defaultdict(int)
 
