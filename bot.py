@@ -96,7 +96,79 @@ async def rekap(event):
     text += f"\n🏆𝗧𝗢𝗧𝗔𝗟: {total}"
 
     await event.reply(text)
+    
+@client.on(events.NewMessage(pattern=r"/rekapkata7"))
+async def rekapkata7(event):
 
+    args = event.raw_text.split()
+
+    if len(args) < 2:
+        await event.reply("Contoh:\n/rekapkata7 kata\natau\n/rekapkata7 kata -100idgrup")
+        return
+
+    kata = args[1].lower()
+
+    chat_id = event.chat_id
+
+    # jika dipakai di privat
+    if not event.is_group:
+        if len(args) < 3:
+            await event.reply("Kirim: /rekapkata7 kata -100idgrup")
+            return
+
+        group_id = int(args[2])
+        chat = await client.get_entity(group_id)
+    else:
+        chat = await event.get_chat()
+
+    wib = timezone(timedelta(hours=7))
+    now = datetime.now(wib)
+
+    start_day = now - timedelta(days=7)
+
+    counts = defaultdict(int)
+
+    async for msg in client.iter_messages(chat):
+
+        if msg.date < start_day:
+            break
+
+        if msg.text and msg.text.startswith("/"):
+            continue
+
+        if not msg.text:
+            continue
+
+        if kata not in msg.text.lower():
+            continue
+
+        if msg.sender_id:
+            counts[msg.sender_id] += 1
+
+    today = datetime.now(wib).strftime("%d %B %Y")
+
+    text = (
+        f"📊 JUMLAH PESAN 7 HARI TERAKHIR\n"
+        f"📅 {today}\n\n"
+        f"📝 PESAN YG DI CARI: {kata}\n\n"
+        f"👤 USER YG MENGIRIM:\n\n"
+    )
+
+    total = 0
+
+    for user_id, jumlah in sorted(counts.items(), key=lambda x: x[1], reverse=True):
+
+        user = await client.get_entity(user_id)
+
+        username = f"@{user.username}" if user.username else user.first_name
+
+        text += f"{username} : {jumlah}\n"
+
+        total += jumlah
+
+    text += f"\n🏆 TOTAL: {total}"
+
+    await event.reply(text)
 # ================= MAIN =================
 
 async def main():
