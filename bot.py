@@ -25,6 +25,18 @@ def run_web():
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
 
+# ================= FUNCTION AMBIL CHAT =================
+
+async def ambil_chat(event, args):
+
+    if len(args) >= 2:
+        try:
+            return await client.get_entity(int(args[1]))
+        except:
+            return await event.get_chat()
+    else:
+        return await event.get_chat()
+
 # ================= REKAP HARI INI =================
 
 @client.on(events.NewMessage(pattern=r"/rekapkata (.+)"))
@@ -33,11 +45,7 @@ async def rekap(event):
     args = event.pattern_match.group(1).split()
     kata = args[0].lower()
 
-    # cek kalau pakai id grup
-    if len(args) > 1:
-        chat = await client.get_entity(int(args[1]))
-    else:
-        chat = await event.get_chat()
+    chat = await ambil_chat(event, args)
 
     wib = timezone(timedelta(hours=7))
     now = datetime.now(wib)
@@ -53,7 +61,6 @@ async def rekap(event):
         if not msg.text:
             continue
 
-        # ❗ abaikan command
         if msg.text.startswith("/"):
             continue
 
@@ -62,13 +69,13 @@ async def rekap(event):
 
         counts[msg.sender_id] += 1
 
-    text = "📊𝗝𝗨𝗠𝗟𝗔𝗛 𝗣𝗘𝗦𝗔𝗡 𝗛𝗔𝗥𝗜 𝗜𝗡𝗜\n\n"
-    text += f"📝𝗣𝗘𝗦𝗔𝗡 𝗬𝗚 𝗗𝗜 𝗖𝗔𝗥𝗜: {kata}\n\n"
-    text += "𝗨𝗦𝗘𝗥 𝗬𝗚 𝗠𝗘𝗡𝗚𝗜𝗥𝗜𝗠:\n"
+    text = "📊 JUMLAH PESAN HARI INI\n\n"
+    text += f"📝 PESAN YG DI CARI: {kata}\n\n"
+    text += "👤 USER YG MENGIRIM:\n"
 
     total = 0
 
-    for uid, jumlah in counts.items():
+    for uid, jumlah in sorted(counts.items(), key=lambda x: x[1], reverse=True):
 
         try:
             user = await client.get_entity(uid)
@@ -79,7 +86,7 @@ async def rekap(event):
         text += f"{name} : {jumlah}\n"
         total += jumlah
 
-    text += f"\n🏆𝗧𝗢𝗧𝗔𝗟: {total}"
+    text += f"\n🏆 TOTAL: {total}"
 
     await event.reply(text)
 
@@ -91,11 +98,7 @@ async def rekap7(event):
     args = event.pattern_match.group(1).split()
     kata = args[0].lower()
 
-    # cek kalau pakai id grup
-    if len(args) > 1:
-        chat = await client.get_entity(int(args[1]))
-    else:
-        chat = await event.get_chat()
+    chat = await ambil_chat(event, args)
 
     wib = timezone(timedelta(hours=7))
     now = datetime.now(wib)
@@ -111,7 +114,6 @@ async def rekap7(event):
         if not msg.text:
             continue
 
-        # ❗ abaikan command
         if msg.text.startswith("/"):
             continue
 
@@ -120,9 +122,13 @@ async def rekap7(event):
 
         counts[msg.sender_id] += 1
 
-    text = "📊𝗥𝗘𝗞𝗔𝗣 𝗞𝗔𝗧𝗔 𝟳 𝗛𝗔𝗥𝗜\n\n"
-    text += f"📝𝗣𝗘𝗦𝗔𝗡 𝗬𝗚 𝗗𝗜 𝗖𝗔𝗥𝗜: {kata}\n\n"
-    text += "𝗨𝗦𝗘𝗥 𝗬𝗚 𝗠𝗘𝗡𝗚𝗜𝗥𝗜𝗠:\n"
+    start_text = start.strftime("%d %B %Y")
+    now_text = now.strftime("%d %B %Y")
+
+    text = "📊 JUMLAH PESAN 7 HARI TERAKHIR\n"
+    text += f"📅 {start_text} - {now_text}\n\n"
+    text += f"📝 PESAN YG DI CARI: {kata}\n\n"
+    text += "👤 USER YG MENGIRIM:\n"
 
     total = 0
 
@@ -137,7 +143,7 @@ async def rekap7(event):
         text += f"{name} : {jumlah}\n"
         total += jumlah
 
-    text += f"\n🏆𝗧𝗢𝗧𝗔𝗟: {total}"
+    text += f"\n🏆 TOTAL: {total}"
 
     await event.reply(text)
 
