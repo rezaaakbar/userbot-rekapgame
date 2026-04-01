@@ -1,187 +1,166 @@
-import telebot
-import json
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+from collections import defaultdict
+from telethon import TelegramClient, events
+from telethon.sessions import StringSession
+from flask import Flask
+from threading import Thread
+import asyncio
 
-TOKEN = "ISI_TOKEN_BOT_KAMU"
-bot = telebot.TeleBot(TOKEN)
+API_ID = int(os.getenv("API_ID"))
+API_HASH = os.getenv("API_HASH")
+SESSION = os.getenv("SESSION")
 
-DATA_FILE = "data.json"
+client = TelegramClient(StringSession(SESSION), API_ID, API_HASH)
 
-if not os.path.exists(DATA_FILE):
-    with open(DATA_FILE, "w") as f:
-        json.dump({}, f)
+# ================= WEB SERVER =================
 
-def load_data():
-    with open(DATA_FILE, "r") as f:
-        return json.load(f)
+app = Flask(__name__)
 
-def save_data(data):
-    with open(DATA_FILE, "w") as f:
-        json.dump(data, f)
+@app.route("/")
+def home():
+    return "BOT HIDUP"
 
-data = load_data()
+def run_web():
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port)
 
+# ================= REKAP HARI INI =================
 
-# ==============================
-# SIMPAN PESAN
-# ==============================
+@client.on(events.NewMessage(pattern=r"/rekapkata (.+)"))
+async def rekap(event):
 
-@bot.message_handler(func=lambda message: True)
-def handle_message(message):
+    args = event.pattern_match.group(1).split()
+    kata = args[0].lower()
 
-    if not message.text:
-        return
-
-    # ❗ Abaikan command
-    if message.text.startswith("/"):
-        return
-
-    chat_id = str(message.chat.id)
-    user = message.from_user.username
-
-    if not user:
-        user = message.from_user.first_name
-
-    text = message.text.lower()
-    date = datetime.now().strftime("%Y-%m-%d")
-
-    words = text.split()
-
-    if chat_id not in data:
-        data[chat_id] = {}
-
-    if date not in data[chat_id]:
-        data[chat_id][date] = {}
-
-    for word in words:
-
-        if word not in data[chat_id][date]:
-            data[chat_id][date][word] = {}
-
-        if user not in data[chat_id][date][word]:
-            data[chat_id][date][word][user] = 0
-
-        data[chat_id][date][word][user] += 1
-
-    save_data(data)
-
-
-# ==============================
-# REKAP HARI INI
-# ==============================
-
-@bot.message_handler(commands=["rekapkata"])
-def rekap_kata(message):
-
-    args = message.text.split()
-
-    if len(args) < 2:
-        bot.reply_to(message, "contoh: /rekapkata anjay")
-        return
-
-    kata = args[1].lower()
-
-    if len(args) == 3:
-        chat_id = args[2]
+    # cek kalau pakai id grup
+    if len(args) > 1:
+        chat = await client.get_entity(int(args[1]))
     else:
-        chat_id = str(message.chat.id)
+        chat = await event.get_chat()
 
-    today = datetime.now().strftime("%Y-%m-%d")
+    wib = timezone(timedelta(hours=7))
+    now = datetime.now(wib)
+    start_day = datetime(now.year, now.month, now.day, tzinfo=wib)
 
-    result = {}
+    counts = defaultdict(int)
 
-    if chat_id in data and today in data[chat_id]:
+    async for msg in client.iter_messages(chat):
 
-        if kata in data[chat_id][today]:
+        if msg.date < start_day:
+            break
 
-            for user, jumlah in data[chat_id][today][kata].items():
-                result[user] = jumlah
+        if not msg.text:
+            continue
 
-    total = sum(result.values())
+        # ❗ abaikan command
+        if msg.text.startswith("/"):
+            continue
 
-    text = "📊𝗝𝗨𝗠𝗟𝗔𝗛 𝗣𝗘𝗦𝗔𝗡 𝗛𝗔𝗥𝗜 𝗜𝗡𝗜\n"
-    text += f"🗓️ {today}\n\n"
+        if kata not in msg.text.lower():
+            continue
 
+        counts[msg.sender_id] += 1
+
+    text = "📊𝗝𝗨𝗠𝗟𝗔𝗛 𝗣𝗘𝗦𝗔𝗡 𝗛𝗔𝗥𝗜 𝗜𝗡𝗜\n\n"
     text += f"📝𝗣𝗘𝗦𝗔𝗡 𝗬𝗚 𝗗𝗜 𝗖𝗔𝗥𝗜: {kata}\n\n"
-
     text += "𝗨𝗦𝗘𝗥 𝗬𝗚 𝗠𝗘𝗡𝗚𝗜𝗥𝗜𝗠:\n"
 
-    for user, jumlah in result.items():
-        text += f"@{user} : {jumlah}\n"
+    total = 0
+
+    for uid, jumlah in counts.items():
+
+        try:
+            user = await client.get_entity(uid)
+            name = f"@{user.username}" if user.username else user.first_name
+        except:
+            name = "user"
+
+        text += f"{name} : {jumlah}\n"
+        total += jumlah
 
     text += f"\n🏆𝗧𝗢𝗧𝗔𝗟: {total}"
 
-    bot.reply_to(message, text)
+    await event.reply(text)
 
+# ================= REKAP 7 HARI =================
 
-# ==============================
-# REKAP 7 HARI
-# ==============================
+@client.on(events.NewMessage(pattern=r"/rekapkata7 (.+)"))
+async def rekap7(event):
 
-@bot.message_handler(commands=["rekapkata7"])
-def rekap_kata7(message):
+    args = event.pattern_match.group(1).split()
+    kata = args[0].lower()
 
-    args = message.text.split()
-
-    if len(args) < 2:
-        bot.reply_to(message, "contoh: /rekapkata7 anjay")
-        return
-
-    kata = args[1].lower()
-
-    if len(args) == 3:
-        chat_id = args[2]
+    # cek kalau pakai id grup
+    if len(args) > 1:
+        chat = await client.get_entity(int(args[1]))
     else:
-        chat_id = str(message.chat.id)
+        chat = await event.get_chat()
 
-    today = datetime.now()
+    wib = timezone(timedelta(hours=7))
+    now = datetime.now(wib)
+    start = now - timedelta(days=7)
 
-    result = {}
+    counts = defaultdict(int)
 
-    for i in range(7):
+    async for msg in client.iter_messages(chat):
 
-        date = (today - timedelta(days=i)).strftime("%Y-%m-%d")
+        if msg.date < start:
+            break
 
-        if chat_id in data and date in data[chat_id]:
+        if not msg.text:
+            continue
 
-            if kata in data[chat_id][date]:
+        # ❗ abaikan command
+        if msg.text.startswith("/"):
+            continue
 
-                for user, jumlah in data[chat_id][date][kata].items():
+        if kata not in msg.text.lower():
+            continue
 
-                    if user not in result:
-                        result[user] = 0
+        counts[msg.sender_id] += 1
 
-                    result[user] += jumlah
-
-    total = sum(result.values())
-
-    start = (today - timedelta(days=6)).strftime("%Y-%m-%d")
-    end = today.strftime("%Y-%m-%d")
-
-    text = "📊𝗥𝗘𝗞𝗔𝗣 𝗞𝗔𝗧𝗔 𝟳 𝗛𝗔𝗥𝗜\n"
-    text += f"🗓️ {start} s/d {end}\n\n"
-
+    text = "📊𝗥𝗘𝗞𝗔𝗣 𝗞𝗔𝗧𝗔 𝟳 𝗛𝗔𝗥𝗜\n\n"
     text += f"📝𝗣𝗘𝗦𝗔𝗡 𝗬𝗚 𝗗𝗜 𝗖𝗔𝗥𝗜: {kata}\n\n"
-
     text += "𝗨𝗦𝗘𝗥 𝗬𝗚 𝗠𝗘𝗡𝗚𝗜𝗥𝗜𝗠:\n"
 
-    for user, jumlah in result.items():
-        text += f"@{user} : {jumlah}\n"
+    total = 0
+
+    for uid, jumlah in sorted(counts.items(), key=lambda x: x[1], reverse=True):
+
+        try:
+            user = await client.get_entity(uid)
+            name = f"@{user.username}" if user.username else user.first_name
+        except:
+            name = "user"
+
+        text += f"{name} : {jumlah}\n"
+        total += jumlah
 
     text += f"\n🏆𝗧𝗢𝗧𝗔𝗟: {total}"
 
-    bot.reply_to(message, text)
+    await event.reply(text)
 
+# ================= AUTO RECONNECT =================
 
-# ==============================
-# START
-# ==============================
+async def start_bot():
 
-@bot.message_handler(commands=["start"])
-def start(message):
-    bot.reply_to(message, "Bot Rekap Kata Aktif.")
+    while True:
 
+        try:
+            print("BOT STARTING...")
+            await client.start()
+            print("BOT AKTIF")
+            await client.run_until_disconnected()
 
-print("BOT AKTIF...")
-bot.infinity_polling()
+        except Exception as e:
+            print("ERROR:", e)
+            await asyncio.sleep(10)
+
+# ================= MAIN =================
+
+if __name__ == "__main__":
+
+    Thread(target=run_web).start()
+
+    client.loop.run_until_complete(start_bot())
