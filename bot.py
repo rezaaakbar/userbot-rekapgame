@@ -24,13 +24,12 @@ def run_web():
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
 
-# ================= REKAP =================
+# ================= REKAP HARI INI =================
 
 @client.on(events.NewMessage(pattern=r"/rekapkata (.+)"))
 async def rekap(event):
 
     args = event.pattern_match.group(1).split()
-
     kata = args[0].lower()
 
     if len(args) >= 2:
@@ -38,7 +37,7 @@ async def rekap(event):
     else:
         chat_id = event.chat_id
 
-    # ===== jika dipakai di privat =====
+    # jika dipakai di privat
     if not event.is_group:
 
         if len(args) < 2:
@@ -62,7 +61,10 @@ async def rekap(event):
         if msg.date < start_day:
             break
 
-        if msg.text and msg.text.startswith("/"):
+        if not msg.text:
+            continue
+
+        if msg.text.startswith("/"):
             continue
 
         if kata not in msg.text.lower():
@@ -71,7 +73,7 @@ async def rekap(event):
         if msg.sender_id:
             counts[msg.sender_id] += 1
 
-    today = datetime.now(wib).strftime("%d %B %Y")
+    today = now.strftime("%d %B %Y")
 
     text = (
         "📊𝗝𝗨𝗠𝗟𝗔𝗛 𝗣𝗘𝗦𝗔𝗡 𝗛𝗔𝗥𝗜 𝗜𝗡𝗜\n"
@@ -96,8 +98,9 @@ async def rekap(event):
     text += f"\n🏆𝗧𝗢𝗧𝗔𝗟: {total}"
 
     await event.reply(text)
-    
-# ================= REKAP7 =================
+
+
+# ================= REKAP 7 HARI =================
 
 @client.on(events.NewMessage(pattern=r"/rekapkata7"))
 async def rekapkata7(event):
@@ -110,16 +113,16 @@ async def rekapkata7(event):
 
     kata = args[1].lower()
 
-    chat_id = event.chat_id
-
     # jika dipakai di privat
     if not event.is_group:
+
         if len(args) < 3:
             await event.reply("Kirim: /rekapkata7 kata -100idgrup")
             return
 
         group_id = int(args[2])
         chat = await client.get_entity(group_id)
+
     else:
         chat = await event.get_chat()
 
@@ -135,10 +138,10 @@ async def rekapkata7(event):
         if msg.date < start_day:
             break
 
-        if msg.text and msg.text.startswith("/"):
+        if not msg.text:
             continue
 
-        if not msg.text:
+        if msg.text.startswith("/"):
             continue
 
         if kata not in msg.text.lower():
@@ -148,28 +151,33 @@ async def rekapkata7(event):
             counts[msg.sender_id] += 1
 
     start_text = start_day.strftime("%d %B %Y")
-end_text = now.strftime("%d %B %Y")
+    end_text = now.strftime("%d %B %Y")
 
-text = (
-"📊 JUMLAH PESAN 7 HARI TERAKHIR\n"
-f"📅 {start_text} - {end_text}\n\n"
-f"📝 PESAN YG DI CARI: {kata}\n\n"
-"👤 USER YG MENGIRIM:\n\n"
-)
+    text = (
+        "📊 JUMLAH PESAN 7 HARI TERAKHIR\n"
+        f"📅 {start_text} - {end_text}\n\n"
+        f"📝 PESAN YG DI CARI: {kata}\n\n"
+        "👤 USER YG MENGIRIM:\n\n"
+    )
 
-total = 0
+    total = 0
 
     for user_id, jumlah in sorted(counts.items(), key=lambda x: x[1], reverse=True):
 
-        user = await client.get_entity(user_id)
-
-        username = f"@{user.username}" if user.username else user.first_name
+        try:
+            user = await client.get_entity(user_id)
+            username = f"@{user.username}" if user.username else user.first_name
+        except:
+            username = "user"
 
         text += f"{username} : {jumlah}\n"
-
         total += jumlah
 
+    text += f"\n🏆𝗧𝗢𝗧𝗔𝗟: {total}"
+
     await event.reply(text)
+
+
 # ================= MAIN =================
 
 async def main():
