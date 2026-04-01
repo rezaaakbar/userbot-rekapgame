@@ -1,11 +1,12 @@
 import os
+import re
+import asyncio
 from datetime import datetime, timedelta, timezone
 from collections import defaultdict
 from telethon import TelegramClient, events
 from telethon.sessions import StringSession
 from flask import Flask
 from threading import Thread
-import asyncio
 
 API_ID = int(os.getenv("API_ID"))
 API_HASH = os.getenv("API_HASH")
@@ -25,7 +26,7 @@ def run_web():
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
 
-# ================= FUNCTION AMBIL CHAT =================
+# ================= AMBIL CHAT =================
 
 async def ambil_chat(event, args):
 
@@ -36,6 +37,13 @@ async def ambil_chat(event, args):
             return await event.get_chat()
     else:
         return await event.get_chat()
+
+# ================= FILTER PESAN =================
+
+def cocok(kata, text):
+
+    pattern = rf'(?<!\w){re.escape(kata)}(?!\w)'
+    return re.search(pattern, text)
 
 # ================= REKAP HARI INI =================
 
@@ -49,29 +57,34 @@ async def rekap(event):
 
     wib = timezone(timedelta(hours=7))
     now = datetime.now(wib)
+
     start_day = datetime(now.year, now.month, now.day, tzinfo=wib)
+
+    me = await client.get_me()
 
     counts = defaultdict(int)
 
-    async for msg in client.iter_messages(chat, offset_date=start_day, reverse=True):
-
-        if msg.date < start_day:
-            break
+    async for msg in client.iter_messages(chat, offset_date=start_day):
 
         if not msg.text:
             continue
 
-        if msg.text.startswith("/"):
+        if msg.sender_id == me.id:
             continue
 
-        if kata not in msg.text.lower():
+        text = msg.text.lower().strip()
+
+        if text.startswith("/"):
+            continue
+
+        if not cocok(kata, text):
             continue
 
         counts[msg.sender_id] += 1
 
-    text = "📊 JUMLAH PESAN HARI INI\n\n"
-    text += f"📝 PESAN YG DI CARI: {kata}\n\n"
-    text += "👤 USER YG MENGIRIM:\n"
+    hasil = "📊 JUMLAH PESAN HARI INI\n\n"
+    hasil += f"📝 PESAN YG DI CARI: {kata}\n\n"
+    hasil += "👤 USER YG MENGIRIM:\n"
 
     total = 0
 
@@ -83,12 +96,12 @@ async def rekap(event):
         except:
             name = "user"
 
-        text += f"{name} : {jumlah}\n"
+        hasil += f"{name} : {jumlah}\n"
         total += jumlah
 
-    text += f"\n🏆 TOTAL: {total}"
+    hasil += f"\n🏆 TOTAL: {total}"
 
-    await event.reply(text)
+    await event.reply(hasil)
 
 # ================= REKAP 7 HARI =================
 
@@ -102,22 +115,27 @@ async def rekap7(event):
 
     wib = timezone(timedelta(hours=7))
     now = datetime.now(wib)
-    start = now - timedelta(days=7)
+
+    start = now - timedelta(days=6)
+
+    me = await client.get_me()
 
     counts = defaultdict(int)
 
-    async for msg in client.iter_messages(chat, offset_date=start, reverse=True):
-
-        if msg.date < start:
-            break
+    async for msg in client.iter_messages(chat, offset_date=start):
 
         if not msg.text:
             continue
 
-        if msg.text.startswith("/"):
+        if msg.sender_id == me.id:
             continue
 
-        if kata not in msg.text.lower():
+        text = msg.text.lower().strip()
+
+        if text.startswith("/"):
+            continue
+
+        if not cocok(kata, text):
             continue
 
         counts[msg.sender_id] += 1
@@ -125,10 +143,10 @@ async def rekap7(event):
     start_text = start.strftime("%d %B %Y")
     now_text = now.strftime("%d %B %Y")
 
-    text = "📊 JUMLAH PESAN 7 HARI TERAKHIR\n"
-    text += f"📅 {start_text} - {now_text}\n\n"
-    text += f"📝 PESAN YG DI CARI: {kata}\n\n"
-    text += "👤 USER YG MENGIRIM:\n"
+    hasil = "📊 JUMLAH PESAN 7 HARI TERAKHIR\n"
+    hasil += f"📅 {start_text} - {now_text}\n\n"
+    hasil += f"📝 PESAN YG DI CARI: {kata}\n\n"
+    hasil += "👤 USER YG MENGIRIM:\n"
 
     total = 0
 
@@ -140,12 +158,12 @@ async def rekap7(event):
         except:
             name = "user"
 
-        text += f"{name} : {jumlah}\n"
+        hasil += f"{name} : {jumlah}\n"
         total += jumlah
 
-    text += f"\n🏆 TOTAL: {total}"
+    hasil += f"\n🏆 TOTAL: {total}"
 
-    await event.reply(text)
+    await event.reply(hasil)
 
 # ================= AUTO RECONNECT =================
 
@@ -169,8 +187,4 @@ if __name__ == "__main__":
 
     Thread(target=run_web).start()
 
-    while True:
-        try:
-            client.loop.run_until_complete(start_bot())
-        except Exception as e:
-            print("RESTART BOT:", e)
+    client.loop.run_until_complete(start_bot())
