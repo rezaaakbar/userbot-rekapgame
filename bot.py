@@ -53,7 +53,7 @@ async def rekap(event):
 
     counts = defaultdict(int)
 
-    async for msg in client.iter_messages(chat):
+    async for msg in client.iter_messages(chat, offset_date=start_day, reverse=True):
 
         if msg.date < start_day:
             break
@@ -106,7 +106,7 @@ async def rekap7(event):
 
     counts = defaultdict(int)
 
-    async for msg in client.iter_messages(chat):
+    async for msg in client.iter_messages(chat, offset_date=start, reverse=True):
 
         if msg.date < start:
             break
