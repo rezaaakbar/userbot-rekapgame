@@ -12,7 +12,13 @@ API_ID = int(os.getenv("API_ID"))
 API_HASH = os.getenv("API_HASH")
 SESSION = os.getenv("SESSION")
 
-client = TelegramClient(StringSession(SESSION), API_ID, API_HASH)
+client = TelegramClient(
+    StringSession(SESSION),
+    API_ID,
+    API_HASH,
+    auto_reconnect=True,
+    connection_retries=None
+)
 
 # ================= WEB SERVER =================
 
@@ -47,8 +53,12 @@ def cocok(kata, text):
 
 # ================= REKAP HARI INI =================
 
-@client.on(events.NewMessage(pattern=r"/rekapkata (.+)"))
+@client.on(events.NewMessage(pattern=r'^/rekapkata(?:\s+(.+))?$'))
 async def rekap(event):
+
+    if not event.pattern_match.group(1):
+        await event.reply("Format: /rekapkata kata")
+        return
 
     args = event.pattern_match.group(1).split()
     kata = args[0].lower()
@@ -64,7 +74,10 @@ async def rekap(event):
 
     counts = defaultdict(int)
 
-    async for msg in client.iter_messages(chat, offset_date=start_day):
+    async for msg in client.iter_messages(chat, reverse=True):
+
+        if msg.date.replace(tzinfo=timezone.utc).astimezone(wib) < start_day:
+            break
 
         if not msg.text:
             continue
@@ -105,8 +118,12 @@ async def rekap(event):
 
 # ================= REKAP 7 HARI =================
 
-@client.on(events.NewMessage(pattern=r"/rekapkata7 (.+)"))
+@client.on(events.NewMessage(pattern=r'^/rekapkata7(?:\s+(.+))?$'))
 async def rekap7(event):
+
+    if not event.pattern_match.group(1):
+        await event.reply("Format: /rekapkata7 kata")
+        return
 
     args = event.pattern_match.group(1).split()
     kata = args[0].lower()
@@ -122,7 +139,12 @@ async def rekap7(event):
 
     counts = defaultdict(int)
 
-    async for msg in client.iter_messages(chat, offset_date=start):
+    async for msg in client.iter_messages(chat, reverse=True):
+
+        msg_time = msg.date.replace(tzinfo=timezone.utc).astimezone(wib)
+
+        if msg_time < start:
+            break
 
         if not msg.text:
             continue
