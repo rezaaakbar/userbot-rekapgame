@@ -169,4 +169,8 @@ if __name__ == "__main__":
 
     Thread(target=run_web).start()
 
-    client.loop.run_until_complete(start_bot())
+    while True:
+        try:
+            client.loop.run_until_complete(start_bot())
+        except Exception as e:
+            print("RESTART BOT:", e)
