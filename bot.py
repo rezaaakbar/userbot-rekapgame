@@ -47,7 +47,8 @@ async def ambil_chat(event, args):
 
 def cocok(katas, text):
 
-    text = text.lower()
+    text = (text or "").lower()
+
     hasil = []
 
     for kata in katas:
@@ -78,7 +79,10 @@ async def proses_rekap(chat, katas, start, end):
 
     async for msg in client.iter_messages(chat, reverse=True):
 
-        msg_time = msg.date.replace(tzinfo=timezone.utc).astimezone(wib)
+        if not msg.date:
+            continue
+
+        msg_time = msg.date.astimezone(wib)
 
         if msg_time < start:
             break
@@ -86,13 +90,13 @@ async def proses_rekap(chat, katas, start, end):
         if msg_time > end:
             continue
 
-        if not msg.text:
+        text = (msg.text or "").lower().strip()
+
+        if not text:
             continue
 
         if msg.sender_id == me.id:
             continue
-
-        text = msg.text.lower().strip()
 
         if text.startswith("/"):
             continue
@@ -125,10 +129,13 @@ async def format_hasil(title, tanggal, katas, user_counts, kata_counts):
 
     hasil += "\n👤 USER:\n"
 
-    for uid, jumlah in sorted(user_counts.items(), key=lambda x: x[1], reverse=True):
+    if not user_counts:
+        hasil += "Tidak ada data\n"
+    else:
+        for uid, jumlah in sorted(user_counts.items(), key=lambda x: x[1], reverse=True):
 
-        name = await get_name(uid)
-        hasil += f"{name} : {jumlah}\n"
+            name = await get_name(uid)
+            hasil += f"{name} : {jumlah}\n"
 
     hasil += "\n🏆 TOTAL:\n"
 
@@ -148,6 +155,7 @@ async def ambil_kata(event):
         return None
 
     args = text.split()
+
     katas = [k.lower() for k in args if not k.startswith("-100")]
 
     if len(katas) < 1:
