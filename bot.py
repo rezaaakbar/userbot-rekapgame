@@ -1,4 +1,5 @@
 import os
+import re
 from datetime import datetime, timedelta, timezone
 from collections import defaultdict
 from telethon import TelegramClient, events
@@ -43,16 +44,21 @@ async def ambil_chat(event, args):
 
     return await event.get_chat()
 
-# ================= CARI KATA =================
+# ================= CARI KATA (MATCH PERSIS) =================
 
 def cocok(katas, text):
 
     text = (text or "").lower()
 
+    # pecah kata termasuk mention
+    kata_pesan = re.findall(r'@\w+|\w+', text)
+
     hasil = set()
 
     for kata in katas:
-        if kata in text:
+        kata = kata.lower()
+
+        if kata in kata_pesan:
             hasil.add(kata)
 
     return list(hasil)
@@ -106,10 +112,8 @@ async def proses_rekap(chat, katas, start, end):
         if not ketemu:
             continue
 
-        # user dihitung 1 kali per pesan
         user_counts[msg.sender_id] += 1
 
-        # kata tidak double dalam 1 pesan
         for k in set(ketemu):
             kata_counts[k] += 1
 
