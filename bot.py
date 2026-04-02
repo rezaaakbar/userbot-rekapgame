@@ -32,23 +32,31 @@ def run_web():
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
 
-# ================= AMBIL CHAT =================
+# ================= AMBIL CHAT DAN KATA =================
 
-async def ambil_chat(event, args):
+async def ambil_chat_dan_kata(event, text):
 
-    if len(args) >= 2:
-        try:
-            return await client.get_entity(int(args[1]))
-        except:
-            return await event.get_chat()
+    match = re.search(r"\((-?\d+)\)", text)
+
+    chat_id = None
+
+    if match:
+        chat_id = int(match.group(1))
+        text = re.sub(r"\((-?\d+)\)", "", text)
+
+    kata_list = text.split()[:5]
+
+    if chat_id:
+        chat = await client.get_entity(chat_id)
     else:
-        return await event.get_chat()
+        chat = await event.get_chat()
+
+    return chat, kata_list
 
 # ================= CEK KATA =================
 
 def cocok(kata, text):
 
-    # lebih stabil buat username dan kata biasa
     kata = kata.lower()
     text = text.lower()
 
@@ -56,7 +64,7 @@ def cocok(kata, text):
 
 # ================= FUNCTION REKAP =================
 
-async def proses_rekap(chat, kata, start_time, end_time):
+async def proses_rekap(chat, kata_list, start_time, end_time):
 
     wib = timezone(timedelta(hours=7))
     me = await client.get_me()
@@ -84,10 +92,10 @@ async def proses_rekap(chat, kata, start_time, end_time):
         if text.startswith("/"):
             continue
 
-        if not cocok(kata, text):
-            continue
-
-        counts[msg.sender_id] += 1
+        for kata in kata_list:
+            if cocok(kata, text):
+                counts[msg.sender_id] += 1
+                break
 
     return counts
 
@@ -117,25 +125,24 @@ async def format_hasil(counts):
 async def rekap_hari_ini(event):
 
     if not event.pattern_match.group(1):
-        await event.reply("Format: /rekapkata kata")
+        await event.reply("Format: /rekapkata kata1 kata2 (IDGRUP)")
         return
 
-    args = event.pattern_match.group(1).split()
-    kata = args[0].lower()
+    text = event.pattern_match.group(1)
 
-    chat = await ambil_chat(event, args)
+    chat, kata_list = await ambil_chat_dan_kata(event, text)
 
     wib = timezone(timedelta(hours=7))
     now = datetime.now(wib)
 
     start = datetime(now.year, now.month, now.day, tzinfo=wib)
 
-    counts = await proses_rekap(chat, kata, start, now)
+    counts = await proses_rekap(chat, kata_list, start, now)
 
     list_user, total = await format_hasil(counts)
 
     hasil = "📊 JUMLAH PESAN HARI INI\n\n"
-    hasil += f"📝 PESAN YG DI CARI: {kata}\n\n"
+    hasil += f"📝 KATA YG DI CARI: {', '.join(kata_list)}\n\n"
     hasil += "👤 USER YG MENGIRIM:\n"
     hasil += list_user
     hasil += f"\n🏆 TOTAL: {total}"
@@ -148,13 +155,12 @@ async def rekap_hari_ini(event):
 async def rekap_kemarin(event):
 
     if not event.pattern_match.group(1):
-        await event.reply("Format: /rekapkata1 kata")
+        await event.reply("Format: /rekapkata1 kata1 kata2 (IDGRUP)")
         return
 
-    args = event.pattern_match.group(1).split()
-    kata = args[0].lower()
+    text = event.pattern_match.group(1)
 
-    chat = await ambil_chat(event, args)
+    chat, kata_list = await ambil_chat_dan_kata(event, text)
 
     wib = timezone(timedelta(hours=7))
     now = datetime.now(wib)
@@ -162,7 +168,7 @@ async def rekap_kemarin(event):
     start = datetime(now.year, now.month, now.day, tzinfo=wib) - timedelta(days=1)
     end = datetime(now.year, now.month, now.day, tzinfo=wib)
 
-    counts = await proses_rekap(chat, kata, start, end)
+    counts = await proses_rekap(chat, kata_list, start, end)
 
     list_user, total = await format_hasil(counts)
 
@@ -170,7 +176,7 @@ async def rekap_kemarin(event):
 
     hasil = "📊 JUMLAH PESAN KEMARIN\n\n"
     hasil += f"📅 {tanggal}\n\n"
-    hasil += f"📝 PESAN YG DI CARI: {kata}\n\n"
+    hasil += f"📝 KATA YG DI CARI: {', '.join(kata_list)}\n\n"
     hasil += "👤 USER YG MENGIRIM:\n"
     hasil += list_user
     hasil += f"\n🏆 TOTAL: {total}"
@@ -183,20 +189,19 @@ async def rekap_kemarin(event):
 async def rekap7(event):
 
     if not event.pattern_match.group(1):
-        await event.reply("Format: /rekapkata7 kata")
+        await event.reply("Format: /rekapkata7 kata1 kata2 (IDGRUP)")
         return
 
-    args = event.pattern_match.group(1).split()
-    kata = args[0].lower()
+    text = event.pattern_match.group(1)
 
-    chat = await ambil_chat(event, args)
+    chat, kata_list = await ambil_chat_dan_kata(event, text)
 
     wib = timezone(timedelta(hours=7))
     now = datetime.now(wib)
 
     start = now - timedelta(days=6)
 
-    counts = await proses_rekap(chat, kata, start, now)
+    counts = await proses_rekap(chat, kata_list, start, now)
 
     list_user, total = await format_hasil(counts)
 
@@ -205,7 +210,7 @@ async def rekap7(event):
 
     hasil = "📊 JUMLAH PESAN 7 HARI TERAKHIR\n"
     hasil += f"📅 {start_text} - {now_text}\n\n"
-    hasil += f"📝 PESAN YG DI CARI: {kata}\n\n"
+    hasil += f"📝 KATA YG DI CARI: {', '.join(kata_list)}\n\n"
     hasil += "👤 USER YG MENGIRIM:\n"
     hasil += list_user
     hasil += f"\n🏆 TOTAL: {total}"
