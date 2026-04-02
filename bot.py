@@ -49,13 +49,13 @@ def cocok(katas, text):
 
     text = (text or "").lower()
 
-    hasil = []
+    hasil = set()
 
     for kata in katas:
         if kata in text:
-            hasil.append(kata)
+            hasil.add(kata)
 
-    return hasil
+    return list(hasil)
 
 # ================= FORMAT USER =================
 
@@ -106,9 +106,11 @@ async def proses_rekap(chat, katas, start, end):
         if not ketemu:
             continue
 
+        # user dihitung 1 kali per pesan
         user_counts[msg.sender_id] += 1
 
-        for k in ketemu:
+        # kata tidak double dalam 1 pesan
+        for k in set(ketemu):
             kata_counts[k] += 1
 
     return user_counts, kata_counts
@@ -156,7 +158,11 @@ async def ambil_kata(event):
 
     args = text.split()
 
-    katas = [k.lower() for k in args if not k.startswith("-100")]
+    katas = []
+
+    for a in args:
+        if not a.startswith("-100"):
+            katas.append(a.lower())
 
     if len(katas) < 1:
         await event.reply("❌ Minimal 1 kata")
