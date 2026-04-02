@@ -26,13 +26,13 @@ app = Flask(__name__)
 
 @app.route("/")
 def home():
-    return "BOT REKAP GAME HIDUP"
+    return "BOT REKAP KATA AKTIF"
 
 def run_web():
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
 
-# ================= AMBIL CHAT DAN KATA =================
+# ================= AMBIL CHAT & KATA =================
 
 async def ambil_chat_dan_kata(event, text):
 
@@ -44,7 +44,7 @@ async def ambil_chat_dan_kata(event, text):
         chat_id = int(match.group(1))
         text = re.sub(r"\((-?\d+)\)", "", text)
 
-    kata_list = text.split()[:5]
+    kata_list = text.split()[:10]
 
     if chat_id:
         chat = await client.get_entity(chat_id)
@@ -53,23 +53,14 @@ async def ambil_chat_dan_kata(event, text):
 
     return chat, kata_list
 
-# ================= CEK KATA =================
-
-def cocok(kata, text):
-
-    kata = kata.lower()
-    text = text.lower()
-
-    return kata in text
-
-# ================= FUNCTION REKAP =================
+# ================= PROSES REKAP =================
 
 async def proses_rekap(chat, kata_list, start_time, end_time):
 
     wib = timezone(timedelta(hours=7))
     me = await client.get_me()
 
-    counts = defaultdict(int)
+    counts = {kata: defaultdict(int) for kata in kata_list}
 
     async for msg in client.iter_messages(chat):
 
@@ -93,31 +84,37 @@ async def proses_rekap(chat, kata_list, start_time, end_time):
             continue
 
         for kata in kata_list:
-            if cocok(kata, text):
-                counts[msg.sender_id] += 1
-                break
+            if kata.lower() in text:
+                counts[kata][msg.sender_id] += 1
 
     return counts
 
 # ================= FORMAT HASIL =================
 
-async def format_hasil(counts):
+async def format_hasil_kata(counts):
 
     hasil = ""
-    total = 0
 
-    for uid, jumlah in sorted(counts.items(), key=lambda x: x[1], reverse=True):
+    for kata in counts:
 
-        try:
-            user = await client.get_entity(uid)
-            name = f"@{user.username}" if user.username else user.first_name
-        except:
-            name = "user"
+        hasil += f"\nKATA: {kata.upper()}\n"
 
-        hasil += f"{name} : {jumlah}\n"
-        total += jumlah
+        total = 0
 
-    return hasil, total
+        for uid, jumlah in sorted(counts[kata].items(), key=lambda x: x[1], reverse=True):
+
+            try:
+                user = await client.get_entity(uid)
+                name = f"@{user.username}" if user.username else user.first_name
+            except:
+                name = "user"
+
+            hasil += f"{name} : {jumlah}\n"
+            total += jumlah
+
+        hasil += f"TOTAL: {total}\n"
+
+    return hasil
 
 # ================= REKAP HARI INI =================
 
@@ -139,13 +136,11 @@ async def rekap_hari_ini(event):
 
     counts = await proses_rekap(chat, kata_list, start, now)
 
-    list_user, total = await format_hasil(counts)
+    list_user = await format_hasil_kata(counts)
 
     hasil = "📊 JUMLAH PESAN HARI INI\n\n"
-    hasil += f"📝 KATA YG DI CARI: {', '.join(kata_list)}\n\n"
-    hasil += "👤 USER YG MENGIRIM:\n"
+    hasil += f"📝 PESAN YG DI CARI: {', '.join(kata_list)}\n"
     hasil += list_user
-    hasil += f"\n🏆 TOTAL: {total}"
 
     await event.reply(hasil)
 
@@ -170,16 +165,14 @@ async def rekap_kemarin(event):
 
     counts = await proses_rekap(chat, kata_list, start, end)
 
-    list_user, total = await format_hasil(counts)
+    list_user = await format_hasil_kata(counts)
 
     tanggal = start.strftime("%d %B %Y")
 
     hasil = "📊 JUMLAH PESAN KEMARIN\n\n"
     hasil += f"📅 {tanggal}\n\n"
-    hasil += f"📝 KATA YG DI CARI: {', '.join(kata_list)}\n\n"
-    hasil += "👤 USER YG MENGIRIM:\n"
+    hasil += f"📝 PESAN YG DI CARI: {', '.join(kata_list)}\n"
     hasil += list_user
-    hasil += f"\n🏆 TOTAL: {total}"
 
     await event.reply(hasil)
 
@@ -203,17 +196,15 @@ async def rekap7(event):
 
     counts = await proses_rekap(chat, kata_list, start, now)
 
-    list_user, total = await format_hasil(counts)
+    list_user = await format_hasil_kata(counts)
 
     start_text = start.strftime("%d %B %Y")
     now_text = now.strftime("%d %B %Y")
 
     hasil = "📊 JUMLAH PESAN 7 HARI TERAKHIR\n"
     hasil += f"📅 {start_text} - {now_text}\n\n"
-    hasil += f"📝 KATA YG DI CARI: {', '.join(kata_list)}\n\n"
-    hasil += "👤 USER YG MENGIRIM:\n"
+    hasil += f"📝 PESAN YG DI CARI: {', '.join(kata_list)}\n"
     hasil += list_user
-    hasil += f"\n🏆 TOTAL: {total}"
 
     await event.reply(hasil)
 
