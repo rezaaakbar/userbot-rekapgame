@@ -13,11 +13,11 @@ API_HASH = os.getenv("API_HASH")
 SESSION = os.getenv("SESSION")
 
 client = TelegramClient(
-    StringSession(SESSION),
-    API_ID,
-    API_HASH,
-    auto_reconnect=True,
-    connection_retries=None
+StringSession(SESSION),
+API_ID,
+API_HASH,
+auto_reconnect=True,
+connection_retries=None
 )
 
 client.parse_mode = "html"
@@ -28,34 +28,13 @@ app = Flask(__name__)
 
 @app.route("/")
 def home():
-    return "BOT REKAP + NABUNG AKTIF"
+    return "BOT REKAP KATA AKTIF"
 
 def run_web():
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
 
-# ================= FUNGSI AMBIL PIN =================
-
-async def ambil_pin(chat_id):
-
-    try:
-
-        chat = await client.get_entity(chat_id)
-
-        if not getattr(chat, "pinned_msg_id", None):
-            return None
-
-        msg = await client.get_messages(chat_id, ids=chat.pinned_msg_id)
-
-        return msg
-
-    except Exception as e:
-
-        print("PIN ERROR:", e)
-
-        return None
-
-# ================= REKAP SYSTEM =================
+# ================= AMBIL CHAT & KATA =================
 
 async def ambil_chat_dan_kata(event, text):
 
@@ -64,28 +43,23 @@ async def ambil_chat_dan_kata(event, text):
     chat_id = None
 
     if match:
-
         chat_id = int(match.group(1))
-
         text = re.sub(r"\((-?\d+)\)", "", text)
 
     kata_list = text.split()[:10]
 
     if chat_id:
-
         chat = await client.get_entity(chat_id)
-
     else:
-
         chat = await event.get_chat()
 
     return chat, kata_list
 
+# ================= PROSES REKAP =================
 
 async def proses_rekap(chat, kata_list, start_time, end_time):
 
     wib = timezone(timedelta(hours=7))
-
     me = await client.get_me()
 
     counts = {kata: defaultdict(int) for kata in kata_list}
@@ -106,21 +80,20 @@ async def proses_rekap(chat, kata_list, start_time, end_time):
         if msg.sender_id == me.id:
             continue
 
-        text = msg.text.lower()
+        text = msg.text.lower().strip()
 
         if text.startswith("/"):
             continue
 
         for kata in kata_list:
-
             if kata.lower() in text:
-
                 counts[kata][msg.sender_id] += 1
 
     return counts
 
+# ================= FORMAT HASIL =================
 
-async def format_hasil(counts):
+async def format_hasil_kata(counts):
 
     hasil = ""
 
@@ -128,91 +101,163 @@ async def format_hasil(counts):
 
         hasil += f"\n🔥 <b>KATA: {kata.upper()}</b>\n"
 
-        nomor = 1
-
         total = 0
 
         for uid, jumlah in sorted(counts[kata].items(), key=lambda x: x[1], reverse=True):
 
             try:
-
                 user = await client.get_entity(uid)
-
                 name = f"@{user.username}" if user.username else user.first_name
-
             except:
-
                 name = "user"
 
-            hasil += f"┣ {nomor}. <b>{name}</b> : <code>{jumlah}</code>\n"
-
-            nomor += 1
-
+            hasil += f"<b>{name}</b> : <code>{jumlah}</code>\n"
             total += jumlah
 
-        hasil += f"┗ 📊 <b>TOTAL:</b> <code>{total}</code>\n"
+        hasil += f"📊 <b>TOTAL:</b> <code>{total}</code>\n"
 
     return hasil
 
-# ================= REKAP COMMAND =================
+# ================= REKAP HARI INI =================
 
-@client.on(events.NewMessage(pattern=r'^/rekapkata'))
+@client.on(events.NewMessage(pattern=r'^/rekapkata(?:\s+(.+))?$'))
 async def rekap_hari_ini(event):
 
-    text = event.raw_text.replace("/rekapkata", "").strip()
-
-    if not text:
-
+    if not event.pattern_match.group(1):
         await event.reply("Format: /rekapkata kata1 kata2 (IDGRUP)")
-
         return
+
+    text = event.pattern_match.group(1)
 
     chat, kata_list = await ambil_chat_dan_kata(event, text)
 
     wib = timezone(timedelta(hours=7))
-
     now = datetime.now(wib)
 
     start = datetime(now.year, now.month, now.day, tzinfo=wib)
 
     counts = await proses_rekap(chat, kata_list, start, now)
 
-    hasil = await format_hasil(counts)
+    list_user = await format_hasil_kata(counts)
 
-    await event.reply("📊 <b>JUMLAH PESAN HARI INI</b>\n\n" + hasil)
+    hasil = "📊 <b>JUMLAH PESAN HARI INI</b>\n\n"
+    hasil += f"📝 <b>PESAN YG DI CARI:</b> {', '.join(kata_list)}\n"
+    hasil += list_user
 
+    await event.reply(hasil)
 
-@client.on(events.NewMessage(pattern=r'^/rekapkata1'))
+# ================= REKAP KEMARIN =================
+
+@client.on(events.NewMessage(pattern=r'^/rekapkata1(?:\s+(.+))?$'))
 async def rekap_kemarin(event):
 
-    text = event.raw_text.replace("/rekapkata1", "").strip()
-
-    if not text:
-
-        await event.reply("Format: /rekapkata1 kata1 kata2")
-
+    if not event.pattern_match.group(1):
+        await event.reply("Format: /rekapkata1 kata1 kata2 (IDGRUP)")
         return
+
+    text = event.pattern_match.group(1)
 
     chat, kata_list = await ambil_chat_dan_kata(event, text)
 
     wib = timezone(timedelta(hours=7))
-
     now = datetime.now(wib)
 
     start = datetime(now.year, now.month, now.day, tzinfo=wib) - timedelta(days=1)
-
     end = datetime(now.year, now.month, now.day, tzinfo=wib)
 
     counts = await proses_rekap(chat, kata_list, start, end)
 
-    hasil = await format_hasil(counts)
+    list_user = await format_hasil_kata(counts)
 
-    await event.reply("📊 <b>JUMLAH PESAN KEMARIN</b>\n\n" + hasil)
+    tanggal = start.strftime("%d %B %Y")
 
+    hasil = "📊 <b>JUMLAH PESAN KEMARIN</b>\n\n"
+    hasil += f"📅 <b>{tanggal}</b>\n\n"
+    hasil += f"📝 <b>PESAN YG DI CARI:</b> {', '.join(kata_list)}\n"
+    hasil += list_user
 
-# ================= NABUNG SYSTEM =================
+    await event.reply(hasil)
 
-def tambah_data(text, nama, jumlah):
+# ================= REKAP 7 HARI =================
+
+@client.on(events.NewMessage(pattern=r'^/rekapkata7(?:\s+(.+))?$'))
+async def rekap7(event):
+
+    if not event.pattern_match.group(1):
+        await event.reply("Format: /rekapkata7 kata1 kata2 (IDGRUP)")
+        return
+
+    text = event.pattern_match.group(1)
+
+    chat, kata_list = await ambil_chat_dan_kata(event, text)
+
+    wib = timezone(timedelta(hours=7))
+    now = datetime.now(wib)
+
+    start = now - timedelta(days=6)
+
+    counts = await proses_rekap(chat, kata_list, start, now)
+
+    list_user = await format_hasil_kata(counts)
+
+    start_text = start.strftime("%d %B %Y")
+    now_text = now.strftime("%d %B %Y")
+
+    hasil = "📊 <b>JUMLAH PESAN 7 HARI TERAKHIR</b>\n"
+    hasil += f"📅 <b>{start_text} - {now_text}</b>\n\n"
+    hasil += f"📝 <b>PESAN YG DI CARI:</b> {', '.join(kata_list)}\n"
+    hasil += list_user
+
+    await event.reply(hasil)
+
+# ================= NABUNG SYSTEM (PRIVATE) =================
+
+async def hapus_pesan(chat_id, msg_id, delay=180):
+    await asyncio.sleep(delay)
+    try:
+        await client.delete_messages(chat_id, msg_id)
+    except:
+        pass
+
+@client.on(events.NewMessage(pattern=r'^/tambah'))
+async def tambah_nabung(event):
+
+    if not event.is_private:
+        return
+
+    if not event.is_reply:
+
+        msg = await event.reply("❌ Reply pesan daftar dulu\n\n/tambah ucil 50")
+
+        asyncio.create_task(hapus_pesan(event.chat_id, msg.id))
+        await event.delete()
+        return
+
+    args = event.raw_text.split()
+
+    if len(args) < 3:
+
+        msg = await event.reply("Format:\n/tambah nama jumlah")
+
+        asyncio.create_task(hapus_pesan(event.chat_id, msg.id))
+        await event.delete()
+        return
+
+    nama = args[1]
+
+    try:
+        jumlah = int(args[2])
+    except:
+
+        msg = await event.reply("Jumlah harus angka")
+
+        asyncio.create_task(hapus_pesan(event.chat_id, msg.id))
+        await event.delete()
+        return
+
+    reply = await event.get_reply_message()
+
+    text = reply.text or ""
 
     lines = text.split("\n")
 
@@ -234,89 +279,59 @@ def tambah_data(text, nama, jumlah):
 
         hasil.append(f"{nama}:{jumlah},")
 
-    return "\n".join(hasil)
+    text_baru = "\n".join(hasil)
 
+    await client.edit_message(event.chat_id, reply.id, text_baru)
 
-@client.on(events.NewMessage(pattern=r'^/tambah'))
-async def tambah(event):
+    msg = await event.reply("✅ SALDO BERHASIL DI TAMBAHKAN")
 
-    if not event.is_group:
+    asyncio.create_task(hapus_pesan(event.chat_id, msg.id))
 
-        await event.reply("❌ Command hanya di grup")
-
-        return
-
-    args = event.raw_text.split()
-
-    if len(args) < 3:
-
-        await event.reply("Format:\n/tambah nama jumlah")
-
-        return
-
-    nama = args[1]
-
-    try:
-
-        jumlah = int(args[2])
-
-    except:
-
-        await event.reply("Jumlah harus angka")
-
-        return
-
-    pin = await ambil_pin(event.chat_id)
-
-    if not pin:
-
-        await event.reply("❌ Pesan PIN tidak ditemukan")
-
-        return
-
-    text = pin.text or ""
-
-    text_baru = tambah_data(text, nama, jumlah)
-
-    await client.edit_message(event.chat_id, pin.id, text_baru)
-
-    await event.reply("✅ Data ditambahkan")
-
+    await event.delete()
 
 @client.on(events.NewMessage(pattern=r'^/total'))
-async def total(event):
+async def total_nabung(event):
 
-    if not event.is_group:
-
-        await event.reply("❌ Command hanya di grup")
-
+    if not event.is_private:
         return
 
-    pin = await ambil_pin(event.chat_id)
+    if not event.is_reply:
 
-    if not pin:
+        msg = await event.reply("❌ Reply pesan daftar dulu")
 
-        await event.reply("❌ PIN tidak ditemukan")
-
+        asyncio.create_task(hapus_pesan(event.chat_id, msg.id))
+        await event.delete()
         return
 
-    angka = re.findall(r'-?\d+', pin.text)
+    reply = await event.get_reply_message()
+
+    text = reply.text or ""
+
+    angka = re.findall(r'-?\d+', text)
 
     total = sum(map(int, angka))
 
-    await event.reply(f"💰 TOTAL: {total}")
+    msg = await event.reply(f"💰 TOTAL: {total}")
 
-# ================= START BOT =================
+    asyncio.create_task(hapus_pesan(event.chat_id, msg.id))
 
-def start_bot():
+    await event.delete()
 
-    print("BOT STARTING...")
+# ================= AUTO RECONNECT =================
 
-    client.start()
+async def start_bot():
 
-    print("BOT AKTIF")
+    while True:
 
-    client.run_until_disconnected()
+        try:
+            print("BOT STARTING...")
+            await client.start()
+            print("BOT AKTIF")
+            await client.run_until_disconnected()
+
+        except Exception as e:
+            print("ERROR:", e)
+            await asyncio.sleep(10)
 
 # ================= MAIN =================
 
@@ -324,4 +339,4 @@ if __name__ == "__main__":
 
     Thread(target=run_web).start()
 
-    start_bot()
+    client.loop.run_until_complete(start_bot())
