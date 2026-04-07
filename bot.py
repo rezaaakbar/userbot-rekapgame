@@ -218,14 +218,18 @@ async def ambil_pesan_semat(chat_id):
 
     try:
 
-        async for msg in client.iter_messages(chat_id, limit=1):
+        chat = await client.get_entity(chat_id)
 
-            if msg.pinned:
-                return msg
+        full = await client.get_messages(chat_id, limit=1)
+
+        if chat.pinned_msg_id:
+            msg = await client.get_messages(chat_id, ids=chat.pinned_msg_id)
+            return msg
 
         return None
 
-    except:
+    except Exception as e:
+        print("ERROR PIN:", e)
         return None
 
 
