@@ -212,27 +212,24 @@ async def rekap7(event):
 
     await event.reply(hasil)
 
-# ================= FITUR NABUNG =================
+# ================= FITUR NABUNG (GRUP) =================
 
-async def ambil_pesan_semat(event):
+async def ambil_pesan_semat(chat_id):
 
-    chat = await event.get_chat()
+    chat = await client.get_entity(chat_id)
 
     if not chat.pinned_msg_id:
         return None
 
-    try:
-        msg = await client.get_messages(chat.id, ids=chat.pinned_msg_id)
-        return msg
-    except:
-        return None
+    msg = await client.get_messages(chat_id, ids=chat.pinned_msg_id)
+
+    return msg
 
 
 def tambah_data(text, nama, angka):
 
     lines = text.split("\n")
     hasil = []
-
     ditemukan = False
 
     for line in lines:
@@ -250,10 +247,10 @@ def tambah_data(text, nama, angka):
     return "\n".join(hasil)
 
 
-@client.on(events.NewMessage(pattern=r'^/tambah\s+(.+)'))
+@client.on(events.NewMessage(pattern=r'^/tambah (.+)'))
 async def tambah_saldo(event):
 
-    if not event.is_private:
+    if not event.is_group:
         return
 
     try:
@@ -261,19 +258,16 @@ async def tambah_saldo(event):
         nama = args[0]
         angka = int(args[1])
     except:
-        await event.reply("Format:\n/tambah nama angka")
+        await event.reply("Format: /tambah nama jumlah")
         return
 
-    msg = await ambil_pesan_semat(event)
+    msg = await ambil_pesan_semat(event.chat_id)
 
     if not msg:
-        await event.reply("Tidak ada pesan yang disematkan")
+        await event.reply("Sematkan pesan data dulu")
         return
 
     text = msg.text or ""
-
-    if nama.lower().startswith("sewa"):
-        angka = -abs(angka)
 
     text_baru = tambah_data(text, nama, angka)
 
@@ -285,13 +279,13 @@ async def tambah_saldo(event):
 @client.on(events.NewMessage(pattern=r'^/total$'))
 async def total_saldo(event):
 
-    if not event.is_private:
+    if not event.is_group:
         return
 
-    msg = await ambil_pesan_semat(event)
+    msg = await ambil_pesan_semat(event.chat_id)
 
     if not msg:
-        await event.reply("Tidak ada pesan yang disematkan")
+        await event.reply("Sematkan pesan data dulu")
         return
 
     text = msg.text or ""
