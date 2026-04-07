@@ -28,7 +28,7 @@ app = Flask(__name__)
 
 @app.route("/")
 def home():
-    return "BOT REKAP KATA AKTIF"
+    return "BOT REKAP + NABUNG AKTIF"
 
 def run_web():
     port = int(os.environ.get("PORT", 10000))
@@ -212,24 +212,29 @@ async def rekap7(event):
 
     await event.reply(hasil)
 
-# ================= FITUR NABUNG (GRUP) =================
+# ================= FITUR NABUNG =================
 
 async def ambil_pesan_semat(chat_id):
 
-    chat = await client.get_entity(chat_id)
+    try:
 
-    if not chat.pinned_msg_id:
+        async for msg in client.iter_messages(chat_id, limit=1):
+
+            if msg.pinned:
+                return msg
+
         return None
 
-    msg = await client.get_messages(chat_id, ids=chat.pinned_msg_id)
-
-    return msg
+    except:
+        return None
 
 
 def tambah_data(text, nama, angka):
 
     lines = text.split("\n")
+
     hasil = []
+
     ditemukan = False
 
     for line in lines:
@@ -237,34 +242,49 @@ def tambah_data(text, nama, angka):
         if line.lower().startswith(nama.lower() + ":"):
 
             ditemukan = True
+
             line = line + f"{angka},"
 
         hasil.append(line)
 
     if not ditemukan:
+
         hasil.append(f"{nama}:{angka},")
 
     return "\n".join(hasil)
 
 
-@client.on(events.NewMessage(pattern=r'^/tambah (.+)'))
+@client.on(events.NewMessage(pattern=r'^/tambah'))
 async def tambah_saldo(event):
 
     if not event.is_group:
+
+        await event.reply("❌ Command ini hanya bisa dipakai di GRUP")
+
         return
 
+    args = event.raw_text.split()
+
+    if len(args) < 3:
+
+        await event.reply("Format salah\n\n/tambah nama jumlah")
+
+        return
+
+    nama = args[1]
+
     try:
-        args = event.pattern_match.group(1).split()
-        nama = args[0]
-        angka = int(args[1])
+        angka = int(args[2])
     except:
-        await event.reply("Format: /tambah nama jumlah")
+        await event.reply("Jumlah harus angka")
         return
 
     msg = await ambil_pesan_semat(event.chat_id)
 
     if not msg:
-        await event.reply("Sematkan pesan data dulu")
+
+        await event.reply("❌ BOT TIDAK MENEMUKAN PESAN PIN\n\nSematkan pesan seperti:\n\nucil:\nsewa:")
+
         return
 
     text = msg.text or ""
@@ -273,19 +293,24 @@ async def tambah_saldo(event):
 
     await client.edit_message(event.chat_id, msg.id, text_baru)
 
-    await event.reply("DATA BERHASIL DITAMBAH")
+    await event.reply("✅ DATA BERHASIL DITAMBAH")
 
 
 @client.on(events.NewMessage(pattern=r'^/total$'))
 async def total_saldo(event):
 
     if not event.is_group:
+
+        await event.reply("❌ Command ini hanya bisa di grup")
+
         return
 
     msg = await ambil_pesan_semat(event.chat_id)
 
     if not msg:
-        await event.reply("Sematkan pesan data dulu")
+
+        await event.reply("❌ PIN TIDAK TERBACA")
+
         return
 
     text = msg.text or ""
@@ -294,9 +319,7 @@ async def total_saldo(event):
 
     total = sum(map(int, angka))
 
-    text_baru = text + f"\n\nTOTAL:{total}"
-
-    await client.edit_message(event.chat_id, msg.id, text_baru)
+    await event.reply(f"💰 TOTAL SEMUA: {total}")
 
 # ================= AUTO RECONNECT =================
 
