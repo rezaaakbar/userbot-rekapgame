@@ -208,6 +208,75 @@ async def rekap7(event):
 
     await event.reply(hasil)
 
+# ================= FITUR NABUNG PRIVAT =================
+
+async def get_pinned_private(event):
+    chat = await event.get_chat()
+    msg = await client.get_messages(chat, ids=chat.pinned_msg_id)
+    return msg
+
+@client.on(events.NewMessage(pattern=r'^/tambah (\w+) (\d+)$'))
+async def tambah_saldo(event):
+
+    if not event.is_private:
+        return
+
+    nama = event.pattern_match.group(1).lower()
+    jumlah = event.pattern_match.group(2)
+
+    msg = await get_pinned_private(event)
+
+    text = msg.text
+    lines = text.split("\n")
+
+    baru = []
+    ketemu = False
+
+    for line in lines:
+
+        cek = line.lower().replace(" ", "")
+
+        if cek.startswith(nama + ":"):
+
+            if "pengeluaran" in text.lower():
+                line = line + f"-{jumlah},"
+            else:
+                line = line + f"{jumlah},"
+
+            ketemu = True
+
+        baru.append(line)
+
+    if not ketemu:
+        await event.reply("𝗡𝗔𝗠𝗔 𝗧𝗜𝗗𝗔𝗞 𝗗𝗜𝗧𝗘𝗠𝗨𝗞𝗔𝗡 𝗗𝗜 𝗟𝗜𝗦𝗧❌")
+        return
+
+    text_baru = "\n".join(baru)
+
+    await client.edit_message(event.chat_id, msg.id, text_baru)
+
+    await event.reply("𝗦𝗔𝗟𝗗𝗢 𝗕𝗘𝗥𝗛𝗔𝗦𝗜𝗟 𝗗𝗜 𝗧𝗔𝗠𝗕𝗔𝗛𝗞𝗔𝗡✅")
+
+@client.on(events.NewMessage(pattern=r'^/total$'))
+async def hitung_total(event):
+
+    if not event.is_private:
+        return
+
+    msg = await get_pinned_private(event)
+
+    text = msg.text
+
+    angka = re.findall(r'-?\d+', text)
+
+    total = sum(map(int, angka))
+
+    text_baru = re.sub(r'total:.*', f'total:{total}', text, flags=re.IGNORECASE)
+
+    await client.edit_message(event.chat_id, msg.id, text_baru)
+
+    await event.reply("𝗦𝗔𝗟𝗗𝗢 𝗕𝗘𝗥𝗛𝗔𝗦𝗜𝗟 𝗗𝗜 𝗝𝗨𝗠𝗟𝗔𝗛𝗞𝗔𝗡🤑")
+
 # ================= AUTO RECONNECT =================
 
 async def start_bot():
