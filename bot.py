@@ -20,6 +20,8 @@ client = TelegramClient(
     connection_retries=None
 )
 
+client.parse_mode = "html"
+
 # ================= WEB SERVER =================
 
 app = Flask(__name__)
@@ -97,9 +99,10 @@ async def format_hasil_kata(counts):
 
     for kata in counts:
 
-        hasil += f"\nKATA: {kata.upper()}\n"
+        hasil += f"\n🔥 <b>KATA: {kata.upper()}</b>\n"
 
         total = 0
+        nomor = 1
 
         for uid, jumlah in sorted(counts[kata].items(), key=lambda x: x[1], reverse=True):
 
@@ -109,10 +112,11 @@ async def format_hasil_kata(counts):
             except:
                 name = "user"
 
-            hasil += f"{name} : {jumlah}\n"
+            hasil += f"┣ {nomor}. <b>{name}</b> : <code>{jumlah}</code>\n"
             total += jumlah
+            nomor += 1
 
-        hasil += f"TOTAL: {total}\n"
+        hasil += f"┗ 📊 <b>TOTAL:</b> <code>{total}</code>\n"
 
     return hasil
 
@@ -138,8 +142,8 @@ async def rekap_hari_ini(event):
 
     list_user = await format_hasil_kata(counts)
 
-    hasil = "📊 JUMLAH PESAN HARI INI\n\n"
-    hasil += f"📝 PESAN YG DI CARI: {', '.join(kata_list)}\n"
+    hasil = "📊 <b>JUMLAH PESAN HARI INI</b>\n\n"
+    hasil += f"📝 <b>PESAN YG DI CARI:</b> {', '.join(kata_list)}\n"
     hasil += list_user
 
     await event.reply(hasil)
@@ -169,9 +173,9 @@ async def rekap_kemarin(event):
 
     tanggal = start.strftime("%d %B %Y")
 
-    hasil = "📊 JUMLAH PESAN KEMARIN\n\n"
-    hasil += f"📅 {tanggal}\n\n"
-    hasil += f"📝 PESAN YG DI CARI: {', '.join(kata_list)}\n"
+    hasil = "📊 <b>JUMLAH PESAN KEMARIN</b>\n\n"
+    hasil += f"📅 <b>{tanggal}</b>\n\n"
+    hasil += f"📝 <b>PESAN YG DI CARI:</b> {', '.join(kata_list)}\n"
     hasil += list_user
 
     await event.reply(hasil)
@@ -201,81 +205,12 @@ async def rekap7(event):
     start_text = start.strftime("%d %B %Y")
     now_text = now.strftime("%d %B %Y")
 
-    hasil = "📊 JUMLAH PESAN 7 HARI TERAKHIR\n"
-    hasil += f"📅 {start_text} - {now_text}\n\n"
-    hasil += f"📝 PESAN YG DI CARI: {', '.join(kata_list)}\n"
+    hasil = "📊 <b>JUMLAH PESAN 7 HARI TERAKHIR</b>\n"
+    hasil += f"📅 <b>{start_text} - {now_text}</b>\n\n"
+    hasil += f"📝 <b>PESAN YG DI CARI:</b> {', '.join(kata_list)}\n"
     hasil += list_user
 
     await event.reply(hasil)
-
-# ================= FITUR NABUNG PRIVAT =================
-
-async def get_pinned_private(event):
-    chat = await event.get_chat()
-    msg = await client.get_messages(chat, ids=chat.pinned_msg_id)
-    return msg
-
-@client.on(events.NewMessage(pattern=r'^/tambah (\w+) (\d+)$'))
-async def tambah_saldo(event):
-
-    if not event.is_private:
-        return
-
-    nama = event.pattern_match.group(1).lower()
-    jumlah = event.pattern_match.group(2)
-
-    msg = await get_pinned_private(event)
-
-    text = msg.text
-    lines = text.split("\n")
-
-    baru = []
-    ketemu = False
-
-    for line in lines:
-
-        cek = line.lower().replace(" ", "")
-
-        if cek.startswith(nama + ":"):
-
-            if "pengeluaran" in text.lower():
-                line = line + f"-{jumlah},"
-            else:
-                line = line + f"{jumlah},"
-
-            ketemu = True
-
-        baru.append(line)
-
-    if not ketemu:
-        await event.reply("𝗡𝗔𝗠𝗔 𝗧𝗜𝗗𝗔𝗞 𝗗𝗜𝗧𝗘𝗠𝗨𝗞𝗔𝗡 𝗗𝗜 𝗟𝗜𝗦𝗧❌")
-        return
-
-    text_baru = "\n".join(baru)
-
-    await client.edit_message(event.chat_id, msg.id, text_baru)
-
-    await event.reply("𝗦𝗔𝗟𝗗𝗢 𝗕𝗘𝗥𝗛𝗔𝗦𝗜𝗟 𝗗𝗜 𝗧𝗔𝗠𝗕𝗔𝗛𝗞𝗔𝗡✅")
-
-@client.on(events.NewMessage(pattern=r'^/total$'))
-async def hitung_total(event):
-
-    if not event.is_private:
-        return
-
-    msg = await get_pinned_private(event)
-
-    text = msg.text
-
-    angka = re.findall(r'-?\d+', text)
-
-    total = sum(map(int, angka))
-
-    text_baru = re.sub(r'total:.*', f'total:{total}', text, flags=re.IGNORECASE)
-
-    await client.edit_message(event.chat_id, msg.id, text_baru)
-
-    await event.reply("𝗦𝗔𝗟𝗗𝗢 𝗕𝗘𝗥𝗛𝗔𝗦𝗜𝗟 𝗗𝗜 𝗝𝗨𝗠𝗟𝗔𝗛𝗞𝗔𝗡🤑")
 
 # ================= AUTO RECONNECT =================
 
