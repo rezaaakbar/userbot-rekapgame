@@ -211,34 +211,24 @@ async def rekap7(event):
     hasil += list_user
 
     await event.reply(hasil)
-# ================= FITUR NABUNG =================
 
-PINNED_MESSAGE_ID = None
+# ================= FITUR NABUNG =================
 
 async def ambil_pesan_semat(event):
 
-    global PINNED_MESSAGE_ID
-
     chat = await event.get_chat()
 
-    if PINNED_MESSAGE_ID:
-        try:
-            msg = await client.get_messages(chat.id, ids=PINNED_MESSAGE_ID)
-            if msg:
-                return msg
-        except:
-            pass
+    if not chat.pinned_msg_id:
+        return None
 
-    pinned = await client.get_messages(chat.id, limit=1, filter="pinned")
-
-    if pinned:
-        PINNED_MESSAGE_ID = pinned[0].id
-        return pinned[0]
-
-    return None
+    try:
+        msg = await client.get_messages(chat.id, ids=chat.pinned_msg_id)
+        return msg
+    except:
+        return None
 
 
-def tambah_data(text, key, angka):
+def tambah_data(text, nama, angka):
 
     lines = text.split("\n")
     hasil = []
@@ -247,22 +237,15 @@ def tambah_data(text, key, angka):
 
     for line in lines:
 
-        if line.lower().startswith(key.lower() + ":"):
+        if line.lower().startswith(nama.lower() + ":"):
 
             ditemukan = True
-
-            if angka >= 0:
-                line = line + f"{angka},"
-            else:
-                line = line + f"{angka},"
+            line = line + f"{angka},"
 
         hasil.append(line)
 
     if not ditemukan:
-        if angka >= 0:
-            hasil.append(f"{key}:{angka},")
-        else:
-            hasil.append(f"{key}:{angka},")
+        hasil.append(f"{nama}:{angka},")
 
     return "\n".join(hasil)
 
@@ -274,36 +257,33 @@ async def tambah_saldo(event):
         return
 
     try:
-
         args = event.pattern_match.group(1).split()
-
-        key = args[0]
+        nama = args[0]
         angka = int(args[1])
-
     except:
-        await event.reply("Format salah\n/tambah nama angka")
+        await event.reply("Format:\n/tambah nama angka")
         return
 
     msg = await ambil_pesan_semat(event)
 
     if not msg:
-        await event.reply("Tidak ada pesan yang di semat")
+        await event.reply("Tidak ada pesan yang disematkan")
         return
 
     text = msg.text or ""
 
-    if key.lower().startswith("sewa"):
+    if nama.lower().startswith("sewa"):
         angka = -abs(angka)
 
-    text_baru = tambah_data(text, key, angka)
+    text_baru = tambah_data(text, nama, angka)
 
     await client.edit_message(event.chat_id, msg.id, text_baru)
 
-    await event.reply("SALDO BERHASIL DI TAMBAHKAN")
+    await event.reply("DATA BERHASIL DITAMBAH")
 
 
 @client.on(events.NewMessage(pattern=r'^/total$'))
-async def hitung_total(event):
+async def total_saldo(event):
 
     if not event.is_private:
         return
@@ -311,7 +291,7 @@ async def hitung_total(event):
     msg = await ambil_pesan_semat(event)
 
     if not msg:
-        await event.reply("Tidak ada pesan yang di semat")
+        await event.reply("Tidak ada pesan yang disematkan")
         return
 
     text = msg.text or ""
@@ -323,6 +303,7 @@ async def hitung_total(event):
     text_baru = text + f"\n\nTOTAL:{total}"
 
     await client.edit_message(event.chat_id, msg.id, text_baru)
+
 # ================= AUTO RECONNECT =================
 
 async def start_bot():
