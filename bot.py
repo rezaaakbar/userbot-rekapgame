@@ -41,14 +41,21 @@ async def hapus_pesan(chat_id, msg_id, delay=180):
     except:
         pass
 
+async def hapus_cmd(chat_id, msg_ids, delay=2):
+    await asyncio.sleep(delay)
+    try:
+        await client.delete_messages(chat_id, msg_ids)
+    except:
+        pass
+
 # ================= AMBIL CHAT =================
 async def ambil_chat_dan_kata(event, text):
-    match = re.search(r"\((-?\d+)\)", text)
+    match = re.search(r"(-?\d+)", text)
     chat_id = None
 
     if match:
         chat_id = int(match.group(1))
-        text = re.sub(r"\((-?\d+)\)", "", text)
+        text = re.sub(r"(-?\d+)", "", text)
 
     kata_list = text.split()[:10]
 
@@ -62,8 +69,6 @@ async def ambil_chat_dan_kata(event, text):
 # ================= PROSES REKAP =================
 async def proses_rekap(chat, kata_list, start_time, end_time):
     wib = timezone(timedelta(hours=7))
-    me = await client.get_me()
-
     counts = {kata: defaultdict(int) for kata in kata_list}
 
     async for msg in client.iter_messages(chat):
@@ -89,10 +94,9 @@ async def proses_rekap(chat, kata_list, start_time, end_time):
 
     return counts
 
-# ================= FORMAT REKAP =================
+# ================= FORMAT =================
 async def format_hasil_kata(counts):
     hasil = ""
-
     for kata in counts:
         hasil += f"\n🔥 <b>KATA: {kata.upper()}</b>\n"
         total = 0
@@ -111,7 +115,7 @@ async def format_hasil_kata(counts):
 
     return hasil
 
-# ================= REKAP HARI INI =================
+# ================= REKAP =================
 @client.on(events.NewMessage(pattern=r'^/rekapkata(?:\s+(.+))?$'))
 async def rekap_hari_ini(event):
     if not event.pattern_match.group(1):
@@ -126,15 +130,11 @@ async def rekap_hari_ini(event):
     start = datetime(now.year, now.month, now.day, tzinfo=wib)
 
     counts = await proses_rekap(chat, kata_list, start, now)
-    list_user = await format_hasil_kata(counts)
-
-    hasil = "📊 JUMLAH PESAN HARI INI\n\n"
-    hasil += f"📝 PESAN DICARI: {', '.join(kata_list)}\n"
-    hasil += list_user
+    hasil = f"📊 JUMLAH PESAN HARI INI\n📅 {now.strftime('%d-%m-%Y')}\n\n"
+    hasil += await format_hasil_kata(counts)
 
     await event.reply(hasil)
 
-# ================= REKAP KEMARIN =================
 @client.on(events.NewMessage(pattern=r'^/rekapkata1(?:\s+(.+))?$'))
 async def rekap_kemarin(event):
     if not event.pattern_match.group(1):
@@ -145,68 +145,3 @@ async def rekap_kemarin(event):
 
     wib = timezone(timedelta(hours=7))
     now = datetime.now(wib)
-
-    start = datetime(now.year, now.month, now.day, tzinfo=wib) - timedelta(days=1)
-    end = datetime(now.year, now.month, now.day, tzinfo=wib)
-
-    counts = await proses_rekap(chat, kata_list, start, end)
-    list_user = await format_hasil_kata(counts)
-
-    hasil = "📊 JUMLAH PESAN KEMARIN\n\n"
-    hasil += list_user
-
-    await event.reply(hasil)
-
-# ================= REKAP 7 HARI =================
-@client.on(events.NewMessage(pattern=r'^/rekapkata7(?:\s+(.+))?$'))
-async def rekap7(event):
-    if not event.pattern_match.group(1):
-        return
-
-    text = event.pattern_match.group(1)
-    chat, kata_list = await ambil_chat_dan_kata(event, text)
-
-    wib = timezone(timedelta(hours=7))
-    now = datetime.now(wib)
-    start = now - timedelta(days=6)
-
-    counts = await proses_rekap(chat, kata_list, start, now)
-    list_user = await format_hasil_kata(counts)
-
-    hasil = "📊 JUMLAH PESAN 7 HARI\n\n"
-    hasil += list_user
-
-    await event.reply(hasil)
-
-# ================= TOTAL =================
-@client.on(events.NewMessage(pattern=r'^/total'))
-async def total_nabung(event):
-    if not event.is_private:
-        return
-
-    if not event.is_reply:
-        return
-
-    reply = await event.get_reply_message()
-    angka = re.findall(r'-?\d+', reply.text or "")
-    total = sum(map(int, angka))
-
-    msg = await event.reply(f"TOTAL: {total}")
-    asyncio.create_task(hapus_pesan(event.chat_id, msg.id))
-
-    await event.delete()
-
-# ================= START BOT =================
-async def start_bot():
-    while True:
-        try:
-            print("BOT START")
-            await client.start()
-            await client.run_until_disconnected()
-        except Exception as e:
-            print("ERROR:", e)
-            await asyncio.sleep(10)
-
-if __name__ == "__main__":
-    Thread(target=run_web).start()
-    client.loop.run_until_complete(start_bot())
