@@ -284,11 +284,26 @@ async def total(event):
         return
 
     reply = await event.get_reply_message()
+
+    lines = (reply.text or "").split("\n")
     angka = re.findall(r'-?\d+', reply.text or "")
     total = sum(map(int, angka))
 
-    msg = await event.reply(f"<b>TOTAL: {total}</b>")
-    asyncio.create_task(hapus_pesan(event.chat_id, msg.id))
+    hasil = []
+    updated = False
+
+    for line in lines:
+        if "total:" in line.lower():
+            line = f"📊 TOTAL: {total}"
+            updated = True
+        hasil.append(line)
+
+    # kalau tidak ada TOTAL: tambahkan di bawah
+    if not updated:
+        hasil.append(f"📊 TOTAL: {total}")
+
+    await client.edit_message(event.chat_id, reply.id, "\n".join(hasil))
+
     await event.delete()
 
 
