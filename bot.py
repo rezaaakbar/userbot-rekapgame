@@ -15,7 +15,7 @@ API_HASH = os.getenv("API_HASH")
 SESSION = os.getenv("SESSION")
 
 if not API_ID or not API_HASH or not SESSION:
-    print("❌ ENV API_ID / API_HASH / SESSION belum diisi!")
+    print("❌ ENV belum lengkap!")
     exit()
 
 API_ID = int(API_ID)
@@ -30,7 +30,7 @@ client = TelegramClient(
 
 client.parse_mode = "html"
 
-# ================= WEB SERVER =================
+# ================= WEB =================
 app = Flask(__name__)
 
 @app.route("/")
@@ -57,6 +57,16 @@ async def balas_sukses(event, text):
     except:
         pass
 
+# ================= AMBIL TARGET (REPLY / PINNED) =================
+async def get_target_message(event):
+    if event.is_reply:
+        return await event.get_reply_message()
+
+    try:
+        return await client.get_pinned_message(event.chat_id)
+    except:
+        return None
+
 # ================= AMBIL CHAT =================
 async def ambil_chat_dan_kata(event, text):
     match = re.search(r"\((-?\d+)\)", text)
@@ -76,7 +86,7 @@ async def ambil_chat_dan_kata(event, text):
     return chat, kata_list
 
 
-# ================= PROSES REKAP (TIDAK DIUBAH) =================
+# ================= REKAP (TIDAK DIUBAH) =================
 async def proses_rekap(chat, kata_list, start_time, end_time):
     wib = timezone(timedelta(hours=7))
     counts = {kata: defaultdict(int) for kata in kata_list}
@@ -122,7 +132,6 @@ async def format_hasil_kata(counts):
     return hasil
 
 
-# ================= REKAP (TIDAK DIUBAH) =================
 @client.on(events.NewMessage(pattern=r'^/rekapkata(?:\s+(.+))?$'))
 async def rekap_hari_ini(event):
     if not event.pattern_match.group(1):
@@ -146,25 +155,22 @@ async def rekap_hari_ini(event):
     await event.reply(hasil)
 
 
-# ================= NABUNG (FIXED) =================
+# ================= NABUNG (REPLY + PINNED FIX) =================
 @client.on(events.NewMessage(pattern=r'^/tambah\s+'))
 async def tambah(event):
-    if not event.is_reply:
+    msg_target = await get_target_message(event)
+    if not msg_target:
         return
 
     args = event.raw_text.split()
-    if len(args) < 3:
-        return
-
     try:
         jumlah = int(args[-1])
     except:
         return
 
     nama = " ".join(args[1:-1]).lower()
-    reply = await event.get_reply_message()
+    lines = (msg_target.text or "").split("\n")
 
-    lines = (reply.text or "").split("\n")
     hasil = []
     bagian = "pemasukan"
 
@@ -173,20 +179,19 @@ async def tambah(event):
             bagian = "pengeluaran"
 
         if line.lower().startswith(nama + ":"):
-            value = jumlah
-            if bagian == "pengeluaran":
-                value = -abs(jumlah)
+            value = jumlah if bagian != "pengeluaran" else -abs(jumlah)
             line = line.strip() + f"{value},"
 
         hasil.append(line)
 
-    await client.edit_message(event.chat_id, reply.id, "\n".join(hasil))
+    await client.edit_message(event.chat_id, msg_target.id, "\n".join(hasil))
     await balas_sukses(event, "BERHASIL DI TAMBAH✅")
 
 
 @client.on(events.NewMessage(pattern=r'^/tambahlist\s+'))
 async def tambahlist(event):
-    if not event.is_reply:
+    msg_target = await get_target_message(event)
+    if not msg_target:
         return
 
     args = event.raw_text.split()
@@ -195,6 +200,7 @@ async def tambahlist(event):
 
     bagian = args[1].lower()
     nama = " ".join(args[2:-1])
+
     try:
         jumlah = int(args[-1])
     except:
@@ -203,8 +209,7 @@ async def tambahlist(event):
     if bagian == "pengeluaran":
         jumlah = -abs(jumlah)
 
-    reply = await event.get_reply_message()
-    lines = (reply.text or "").split("\n")
+    lines = (msg_target.text or "").split("\n")
 
     hasil = []
     inserted = False
@@ -216,7 +221,7 @@ async def tambahlist(event):
             hasil.append(f"{nama}:{jumlah},")
             inserted = True
 
-    await client.edit_message(event.chat_id, reply.id, "\n".join(hasil))
+    await client.edit_message(event.chat_id, msg_target.id, "\n".join(hasil))
     await balas_sukses(event, "BERHASIL DI TAMBAHLIST✅")
 
 
@@ -226,10 +231,8 @@ async def editlist(event):
         return
 
     args = event.raw_text.split()
-    if len(args) < 3:
-        return
-
     nama = " ".join(args[1:-1]).lower()
+
     try:
         jumlah = int(args[-1])
     except:
@@ -283,22 +286,18 @@ async def total(event):
     await event.delete()
 
 
-# ================= START BOT (FIXED STABLE) =================
+# ================= START BOT =================
 async def start_bot():
     while True:
         try:
-            print("🚀 BOT STARTING...")
+            print("🚀 BOT START")
             await client.start()
-            print("✅ BOT READY")
             await client.run_until_disconnected()
-
-        except Exception as e:
-            print("❌ ERROR BOT CRASH:")
+        except Exception:
             traceback.print_exc()
             await asyncio.sleep(5)
 
 
-# ================= MAIN =================
 if __name__ == "__main__":
     Thread(target=run_web, daemon=True).start()
     client.loop.run_until_complete(start_bot())
