@@ -23,7 +23,8 @@ client = TelegramClient(
 client.parse_mode = "html"
 
 # ================= WEB SERVER =================
-app = Flask(__name__)
+if __name__ == "__main__":
+    run_web()
 
 @app.route("/")
 def home():
