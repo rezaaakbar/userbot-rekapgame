@@ -60,12 +60,18 @@ async def balas_sukses(event, text):
 # ================= PINNED / REPLY =================
 async def get_target_message(event):
     if event.is_reply:
-        return await event.get_reply_message()
+        msg = await event.get_reply_message()
+        if msg:
+            return msg
 
     try:
-        return await client.get_pinned_message(event.chat_id)
+        async for msg in client.iter_messages(event.chat_id, limit=20):
+            if getattr(msg, "pinned", False):
+                return msg
     except:
-        return None
+        pass
+
+    return None
 
 # ================= AMBIL CHAT =================
 async def ambil_chat_dan_kata(event, text):
@@ -86,7 +92,7 @@ async def ambil_chat_dan_kata(event, text):
     return chat, kata_list
 
 
-# ================= REKAP CORE =================
+# ================= REKAP (TIDAK DIUBAH) =================
 async def proses_rekap(chat, kata_list, start_time, end_time):
     wib = timezone(timedelta(hours=7))
     counts = {kata: defaultdict(int) for kata in kata_list}
@@ -132,7 +138,7 @@ async def format_hasil_kata(counts):
     return hasil
 
 
-# ================= /REKAPKATA HARI INI =================
+# ================= REKAP HARI INI =================
 @client.on(events.NewMessage(pattern=r'^/rekapkata(?:\s+(.+))?$'))
 async def rekap_hari_ini(event):
     if not event.pattern_match.group(1):
@@ -156,7 +162,7 @@ async def rekap_hari_ini(event):
     await event.reply(hasil)
 
 
-# ================= /REKAPKATA1 (KEMARIN) =================
+# ================= REKAP KEMARIN =================
 @client.on(events.NewMessage(pattern=r'^/rekapkata1(?:\s+(.+))?$'))
 async def rekap_kemarin(event):
     if not event.pattern_match.group(1):
@@ -182,7 +188,7 @@ async def rekap_kemarin(event):
     await event.reply(hasil)
 
 
-# ================= /REKAPKATA7 (7 HARI) =================
+# ================= REKAP 7 HARI =================
 @client.on(events.NewMessage(pattern=r'^/rekapkata7(?:\s+(.+))?$'))
 async def rekap7(event):
     if not event.pattern_match.group(1):
@@ -207,7 +213,7 @@ async def rekap7(event):
     await event.reply(hasil)
 
 
-# ================= NABUNG (REPLY + PINNED) =================
+# ================= NABUNG =================
 @client.on(events.NewMessage(pattern=r'^/tambah\s+'))
 async def tambah(event):
     msg_target = await get_target_message(event)
@@ -277,7 +283,7 @@ async def tambahlist(event):
     await balas_sukses(event, "BERHASIL DI TAMBAHLIST✅")
 
 
-# ================= TOTAL =================
+# ================= TOTAL (EDIT PESAN, BUKAN KIRIM BARU) =================
 @client.on(events.NewMessage(pattern=r'^/total'))
 async def total(event):
     if not event.is_reply:
@@ -285,9 +291,10 @@ async def total(event):
 
     reply = await event.get_reply_message()
 
-    lines = (reply.text or "").split("\n")
     angka = re.findall(r'-?\d+', reply.text or "")
     total = sum(map(int, angka))
+
+    lines = (reply.text or "").split("\n")
 
     hasil = []
     updated = False
@@ -298,7 +305,6 @@ async def total(event):
             updated = True
         hasil.append(line)
 
-    # kalau tidak ada TOTAL: tambahkan di bawah
     if not updated:
         hasil.append(f"📊 TOTAL: {total}")
 
