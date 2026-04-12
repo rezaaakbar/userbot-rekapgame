@@ -1,4 +1,3 @@
-
 import os
 import re
 import asyncio
@@ -10,7 +9,7 @@ from flask import Flask
 from threading import Thread
 import traceback
 
-# ================= ENV SAFE =================
+# ================= ENV =================
 API_ID = os.getenv("API_ID")
 API_HASH = os.getenv("API_HASH")
 SESSION = os.getenv("SESSION")
@@ -58,15 +57,23 @@ async def balas_sukses(event, text):
     except:
         pass
 
-# ================= PINNED / REPLY =================
+# ================= REPLY / PINNED =================
 async def get_target_message(event):
+    # PRIORITAS 1: reply
     if event.is_reply:
-        return await event.get_reply_message()
+        msg = await event.get_reply_message()
+        if msg and msg.text:
+            return msg
 
+    # PRIORITAS 2: pinned (scan aman untuk private)
     try:
-        return await client.get_pinned_message(event.chat_id)
+        async for msg in client.iter_messages(event.chat_id, limit=20):
+            if getattr(msg, "pinned", False):
+                return msg
     except:
-        return None
+        pass
+
+    return None
 
 # ================= AMBIL CHAT =================
 async def ambil_chat_dan_kata(event, text):
@@ -87,7 +94,7 @@ async def ambil_chat_dan_kata(event, text):
     return chat, kata_list
 
 
-# ================= REKAP CORE =================
+# ================= REKAP CORE (TIDAK DIUBAH LOGIC) =================
 async def proses_rekap(chat, kata_list, start_time, end_time):
     wib = timezone(timedelta(hours=7))
     counts = {kata: defaultdict(int) for kata in kata_list}
@@ -133,7 +140,7 @@ async def format_hasil_kata(counts):
     return hasil
 
 
-# ================= /REKAPKATA HARI INI =================
+# ================= /REKAPKATA =================
 @client.on(events.NewMessage(pattern=r'^/rekapkata(?:\s+(.+))?$'))
 async def rekap_hari_ini(event):
     if not event.pattern_match.group(1):
@@ -157,7 +164,7 @@ async def rekap_hari_ini(event):
     await event.reply(hasil)
 
 
-# ================= /REKAPKATA1 (KEMARIN) =================
+# ================= /REKAPKATA1 =================
 @client.on(events.NewMessage(pattern=r'^/rekapkata1(?:\s+(.+))?$'))
 async def rekap_kemarin(event):
     if not event.pattern_match.group(1):
@@ -183,7 +190,7 @@ async def rekap_kemarin(event):
     await event.reply(hasil)
 
 
-# ================= /REKAPKATA7 (7 HARI) =================
+# ================= /REKAPKATA7 =================
 @client.on(events.NewMessage(pattern=r'^/rekapkata7(?:\s+(.+))?$'))
 async def rekap7(event):
     if not event.pattern_match.group(1):
@@ -208,7 +215,7 @@ async def rekap7(event):
     await event.reply(hasil)
 
 
-# ================= NABUNG (REPLY + PINNED) =================
+# ================= NABUNG =================
 @client.on(events.NewMessage(pattern=r'^/tambah\s+'))
 async def tambah(event):
     msg_target = await get_target_message(event)
