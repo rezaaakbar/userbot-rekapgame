@@ -319,5 +319,6 @@ app.add_handler(CallbackQueryHandler(callback))
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, set_days))
 app.add_handler(MessageHandler(~filters.COMMAND, auto_delete))
 
+
 print("BOT TEST RUNNING...")
-app.run_polling(drop_pending_updates=True)
+app.run_polling(drop_pending_updates=True, allowed_updates=Update.ALL_TYPES)
