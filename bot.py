@@ -1,7 +1,8 @@
 import os
 import time
+import asyncio
 import logging
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, Bot
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
@@ -22,10 +23,15 @@ MONGO_URI = os.getenv("MONGO_URI")
 OWNER_ID = 6818257079
 OWNER_USERNAME = "@KINGZAAASLI"
 
+# ================= SAFE WEBHOOK RESET =================
+
+bot = Bot(TOKEN)
+bot.delete_webhook(drop_pending_updates=True)
+
+# ================= DB =================
+
 client = MongoClient(MONGO_URI)
 db = client["telegram_bot"]
-
-# 🔥 BOT KE-2 (TEST DB)
 groups_col = db["groups_test"]
 
 pending_sewa = {}
@@ -40,7 +46,7 @@ RESP = {
     "delete_off": "𝗗𝗔𝗛 𝗕𝗘𝗥𝗛𝗘𝗡𝗧𝗜 𝗕𝗢𝗦𝗦🥰",
 }
 
-# ================= DB =================
+# ================= GROUP =================
 
 def get_group(chat_id):
     g = groups_col.find_one({"chat_id": str(chat_id)})
@@ -70,9 +76,7 @@ def is_allowed(uid, g):
 
 
 async def reject(msg):
-    await msg.reply_text(
-        f"𝗟𝗔𝗨 𝗦𝗜𝗔𝗣𝗘 𝗠𝗣𝗥𝗨𝗬? 𝗠𝗜𝗡𝗧𝗔 𝗜𝗭𝗜𝗡 𝗦𝗔𝗠𝗔 {OWNER_USERNAME}"
-    )
+    await msg.reply_text(f"𝗠𝗜𝗡𝗧𝗔 𝗜𝗭𝗜𝗡 𝗦𝗔𝗠𝗔 {OWNER_USERNAME}")
 
 # ================= ADD USER =================
 
@@ -104,9 +108,6 @@ async def deluser(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if msg.from_user.id != OWNER_ID:
         return await msg.reply_text("KHUSUS OWNER")
-
-    if not context.args:
-        return await msg.reply_text("Contoh: /deluser nama")
 
     name = context.args[0].lower()
 
@@ -161,9 +162,6 @@ async def deletepesan(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_allowed(msg.from_user.id, g):
         return await reject(msg)
 
-    if not context.args:
-        return await msg.reply_text("Contoh: /deletepesan on/off")
-
     mode = context.args[0].lower()
 
     if mode == "on":
@@ -181,7 +179,6 @@ async def deletepesan(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def auto_delete(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         msg = update.message
-
         if not msg or msg.chat.type == "private":
             return
 
@@ -232,7 +229,7 @@ async def sewabot(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=keyboard
     )
 
-    await msg.reply_text("SEWA DIKIRIM KE OWNER")
+    await msg.reply_text("REQUEST DIKIRIM KE OWNER")
 
 # ================= CALLBACK =================
 
@@ -310,7 +307,6 @@ app = ApplicationBuilder().token(TOKEN).build()
 app.add_handler(CommandHandler("adduser", adduser))
 app.add_handler(CommandHandler("deluser", deluser))
 app.add_handler(CommandHandler("listuser", listuser))
-
 app.add_handler(CommandHandler("add", add))
 app.add_handler(CommandHandler("deletepesan", deletepesan))
 app.add_handler(CommandHandler("sewabot", sewabot))
@@ -319,6 +315,5 @@ app.add_handler(CallbackQueryHandler(callback))
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, set_days))
 app.add_handler(MessageHandler(~filters.COMMAND, auto_delete))
 
-
 print("BOT TEST RUNNING...")
-app.run_polling(drop_pending_updates=True, allowed_updates=Update.ALL_TYPES)
+app.run_polling(drop_pending_updates=True)
