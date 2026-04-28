@@ -1,207 +1,330 @@
 import os
-import time
-import logging
-from flask import Flask, request
-from telegram import Update, Bot
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
-from pymongo import MongoClient
+import re
+import asyncio
+from datetime import datetime, timedelta, timezone
+from collections import defaultdict
+from telethon import TelegramClient, events
+from telethon.sessions import StringSession
+from flask import Flask
+from threading import Thread
+import traceback
 
-# ================= CONFIG =================
-TOKEN = os.getenv("BOT_TOKEN")
-MONGO_URI = os.getenv("MONGO_URI")
+# ================= ENV SAFE =================
+API_ID = os.getenv("API_ID")
+API_HASH = os.getenv("API_HASH")
+SESSION = os.getenv("SESSION")
 
-WEBHOOK_URL = "https://userbot-rekapgame-gq2v.onrender.com"
-
-OWNER_ID = 6818257079
-OWNER_USERNAME = "@KINGZAAASLI"
-
-if not TOKEN or not MONGO_URI:
+if not API_ID or not API_HASH or not SESSION:
     print("❌ ENV belum lengkap!")
     exit()
 
-logging.basicConfig(level=logging.INFO)
+API_ID = int(API_ID)
 
-# ================= DB =================
-client = MongoClient(MONGO_URI)
-db = client["telegram_bot"]
-col = db["groups"]
+client = TelegramClient(
+    StringSession(SESSION),
+    API_ID,
+    API_HASH,
+    auto_reconnect=True,
+    connection_retries=5
+)
 
-# ================= FLASK =================
+client.parse_mode = "html"
+
+# ================= WEB =================
 app = Flask(__name__)
-
-# ================= BOT =================
-tg_app = ApplicationBuilder().token(TOKEN).build()
-
-# ================= GROUP =================
-def get_group(chat_id):
-    g = col.find_one({"chat_id": str(chat_id)})
-    if not g:
-        g = {
-            "chat_id": str(chat_id),
-            "allowed_users": {},
-            "targets": {},
-            "delete_on": False
-        }
-        col.insert_one(g)
-    return g
-
-def save_group(g):
-    col.update_one({"chat_id": g["chat_id"]}, {"$set": g})
-
-def is_allowed(uid, g):
-    return uid == OWNER_ID or str(uid) in g.get("allowed_users", {})
-
-async def reject(msg):
-    await msg.reply_text(f"𝗠𝗜𝗡𝗧𝗔 𝗜𝗭𝗜𝗡 𝗦𝗔𝗠𝗔 {OWNER_USERNAME}")
-
-# ================= START =================
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("BOT WEBHOOK AKTIF ✅")
-
-# ================= ADD TARGET =================
-async def add(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    msg = update.message
-    g = get_group(msg.chat.id)
-
-    if not is_allowed(msg.from_user.id, g):
-        return await reject(msg)
-
-    if not msg.reply_to_message:
-        return await msg.reply_text("REPLY USER DULU")
-
-    uid = str(msg.reply_to_message.from_user.id)
-    name = context.args[0].lower()
-
-    g["targets"][uid] = name
-    save_group(g)
-
-    await msg.reply_text("TARGET DITAMBAH")
-
-# ================= DELETE TARGET =================
-async def delete(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    msg = update.message
-    g = get_group(msg.chat.id)
-
-    if not is_allowed(msg.from_user.id, g):
-        return await reject(msg)
-
-    name = context.args[0].lower()
-
-    for uid, n in list(g["targets"].items()):
-        if n == name:
-            del g["targets"][uid]
-            save_group(g)
-            return await msg.reply_text("TARGET DIHAPUS")
-
-# ================= ADD USER =================
-async def adduser(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    msg = update.message
-    g = get_group(msg.chat.id)
-
-    if not is_allowed(msg.from_user.id, g):
-        return await reject(msg)
-
-    uid = str(msg.reply_to_message.from_user.id)
-    name = context.args[0].lower()
-
-    g["allowed_users"][uid] = name
-    save_group(g)
-
-    await msg.reply_text("USER DITAMBAH")
-
-# ================= DEL USER (PRIVATE ONLY) =================
-async def deluser(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    msg = update.message
-
-    if msg.chat.type != "private":
-        return await msg.reply_text("PRIVATE ONLY")
-
-    if msg.from_user.id != OWNER_ID:
-        return await msg.reply_text("OWNER ONLY")
-
-    name = context.args[0].lower()
-
-    for g in col.find():
-        for uid, n in list(g.get("allowed_users", {}).items()):
-            if n == name:
-                del g["allowed_users"][uid]
-                save_group(g)
-                return await msg.reply_text("USER DIHAPUS")
-
-# ================= LIST USER =================
-async def listuser(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    msg = update.message
-
-    text = "📌 LIST USER:\n\n"
-    for g in col.find():
-        for uid, name in g.get("allowed_users", {}).items():
-            text += f"{name} | {uid} | {g['chat_id']}\n"
-
-    await msg.reply_text(text)
-
-# ================= DELETE PESAN =================
-async def deletepesan(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    msg = update.message
-    g = get_group(msg.chat.id)
-
-    if not is_allowed(msg.from_user.id, g):
-        return await reject(msg)
-
-    if context.args[0] == "on":
-        g["delete_on"] = True
-    else:
-        g["delete_on"] = False
-
-    save_group(g)
-    await msg.reply_text("UPDATE DELETE PESAN")
-
-# ================= AUTO DELETE =================
-async def auto(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    try:
-        msg = update.message
-        if not msg or msg.chat.type == "private":
-            return
-
-        g = get_group(msg.chat.id)
-
-        if g.get("delete_on") and str(msg.from_user.id) in g.get("targets", {}):
-            await msg.delete()
-
-    except:
-        pass
-
-# ================= REGISTER HANDLER =================
-tg_app.add_handler(CommandHandler("start", start))
-tg_app.add_handler(CommandHandler("add", add))
-tg_app.add_handler(CommandHandler("delete", delete))
-tg_app.add_handler(CommandHandler("adduser", adduser))
-tg_app.add_handler(CommandHandler("deluser", deluser))
-tg_app.add_handler(CommandHandler("listuser", listuser))
-tg_app.add_handler(CommandHandler("deletepesan", deletepesan))
-tg_app.add_handler(MessageHandler(~filters.COMMAND, auto))
-
-# ================= WEBHOOK =================
-@app.route(f"/{TOKEN}", methods=["POST"])
-def webhook():
-    update = Update.de_json(request.get_json(force=True), tg_app.bot)
-    tg_app.update_queue.put_nowait(update)
-    return "ok"
 
 @app.route("/")
 def home():
-    return "BOT RUNNING ✅"
+    return "BOT AKTIF"
 
-# ================= SET WEBHOOK =================
-async def set_webhook():
-    bot = Bot(TOKEN)
-    await bot.delete_webhook(drop_pending_updates=True)
-    await bot.set_webhook(url=f"{WEBHOOK_URL}/{TOKEN}")
+def run_web():
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port)
 
-# ================= RUN =================
+# ================= HELPER =================
+async def hapus_pesan(chat_id, msg_id, delay=2):
+    await asyncio.sleep(delay)
+    try:
+        await client.delete_messages(chat_id, msg_id)
+    except:
+        pass
+
+async def balas_sukses(event, text):
+    try:
+        msg = await event.reply(f"<b>{text}</b>")
+        asyncio.create_task(hapus_pesan(event.chat_id, msg.id))
+        await event.delete()
+    except:
+        pass
+
+# ================= PINNED / REPLY =================
+async def get_target_message(event):
+    if event.is_reply:
+        msg = await event.get_reply_message()
+        if msg:
+            return msg
+
+    try:
+        async for msg in client.iter_messages(event.chat_id, limit=20):
+            if getattr(msg, "pinned", False):
+                return msg
+    except:
+        pass
+
+    return None
+
+# ================= AMBIL CHAT =================
+async def ambil_chat_dan_kata(event, text):
+    match = re.search(r"\((-?\d+)\)", text)
+    chat_id = None
+
+    if match:
+        chat_id = int(match.group(1))
+        text = re.sub(r"\((-?\d+)\)", "", text)
+
+    kata_list = text.split()[:10]
+
+    if chat_id:
+        chat = await client.get_entity(chat_id)
+    else:
+        chat = await event.get_chat()
+
+    return chat, kata_list
+
+
+# ================= REKAP (TIDAK DIUBAH) =================
+async def proses_rekap(chat, kata_list, start_time, end_time):
+    wib = timezone(timedelta(hours=7))
+    counts = {kata: defaultdict(int) for kata in kata_list}
+
+    async for msg in client.iter_messages(chat):
+        msg_time = msg.date.replace(tzinfo=timezone.utc).astimezone(wib)
+
+        if msg_time < start_time:
+            break
+        if msg_time > end_time:
+            continue
+        if not msg.text:
+            continue
+
+        text = msg.text.lower().strip()
+        if text.startswith("/"):
+            continue
+
+        for kata in kata_list:
+            if kata.lower() in text:
+                counts[kata][msg.sender_id] += 1
+
+    return counts
+
+
+async def format_hasil_kata(counts):
+    hasil = ""
+    for kata in counts:
+        hasil += f"\n🔥 <b>KATA: {kata.upper()}</b>\n"
+        total = 0
+
+        for uid, jumlah in sorted(counts[kata].items(), key=lambda x: x[1], reverse=True):
+            try:
+                user = await client.get_entity(uid)
+                name = f"@{user.username}" if user.username else user.first_name
+            except:
+                name = "user"
+
+            hasil += f"{name} : <code>{jumlah}</code>\n"
+            total += jumlah
+
+        hasil += f"📊 TOTAL: <code>{total}</code>\n"
+    return hasil
+
+
+# ================= REKAP HARI INI =================
+@client.on(events.NewMessage(pattern=r'^/rekapkata(?:\s+(.+))?$'))
+async def rekap_hari_ini(event):
+    if not event.pattern_match.group(1):
+        await event.reply("Format: /rekapkata kata1 kata2")
+        return
+
+    text = event.pattern_match.group(1)
+    chat, kata_list = await ambil_chat_dan_kata(event, text)
+
+    wib = timezone(timedelta(hours=7))
+    now = datetime.now(wib)
+    start = datetime(now.year, now.month, now.day, tzinfo=wib)
+
+    counts = await proses_rekap(chat, kata_list, start, now)
+    list_user = await format_hasil_kata(counts)
+
+    hasil = f"📊 JUMLAH PESAN HARI INI\n📅 {now.strftime('%d-%m-%Y')}\n\n"
+    hasil += f"📝 PESAN DICARI: {', '.join(kata_list)}\n"
+    hasil += list_user
+
+    await event.reply(hasil)
+
+
+# ================= REKAP KEMARIN =================
+@client.on(events.NewMessage(pattern=r'^/rekapkata1(?:\s+(.+))?$'))
+async def rekap_kemarin(event):
+    if not event.pattern_match.group(1):
+        await event.reply("Format: /rekapkata1 kata1 kata2")
+        return
+
+    text = event.pattern_match.group(1)
+    chat, kata_list = await ambil_chat_dan_kata(event, text)
+
+    wib = timezone(timedelta(hours=7))
+    now = datetime.now(wib)
+
+    start = datetime(now.year, now.month, now.day, tzinfo=wib) - timedelta(days=1)
+    end = datetime(now.year, now.month, now.day, tzinfo=wib)
+
+    counts = await proses_rekap(chat, kata_list, start, end)
+    list_user = await format_hasil_kata(counts)
+
+    hasil = f"📊 JUMLAH PESAN KEMARIN\n📅 {(now - timedelta(days=1)).strftime('%d-%m-%Y')}\n\n"
+    hasil += f"📝 PESAN DICARI: {', '.join(kata_list)}\n"
+    hasil += list_user
+
+    await event.reply(hasil)
+
+
+# ================= REKAP 7 HARI =================
+@client.on(events.NewMessage(pattern=r'^/rekapkata7(?:\s+(.+))?$'))
+async def rekap7(event):
+    if not event.pattern_match.group(1):
+        await event.reply("Format: /rekapkata7 kata1 kata2")
+        return
+
+    text = event.pattern_match.group(1)
+    chat, kata_list = await ambil_chat_dan_kata(event, text)
+
+    wib = timezone(timedelta(hours=7))
+    now = datetime.now(wib)
+
+    start = now - timedelta(days=6)
+
+    counts = await proses_rekap(chat, kata_list, start, now)
+    list_user = await format_hasil_kata(counts)
+
+    hasil = f"📊 JUMLAH PESAN 7 HARI\n📅 {start.strftime('%d-%m-%Y')} s/d {now.strftime('%d-%m-%Y')}\n\n"
+    hasil += f"📝 PESAN DICARI: {', '.join(kata_list)}\n"
+    hasil += list_user
+
+    await event.reply(hasil)
+
+
+# ================= NABUNG =================
+@client.on(events.NewMessage(pattern=r'^/tambah\s+'))
+async def tambah(event):
+    msg_target = await get_target_message(event)
+    if not msg_target:
+        return
+
+    args = event.raw_text.split()
+    try:
+        jumlah = int(args[-1])
+    except:
+        return
+
+    nama = " ".join(args[1:-1]).lower()
+    lines = (msg_target.text or "").split("\n")
+
+    hasil = []
+    bagian = "pemasukan"
+
+    for line in lines:
+        if "pengeluaran" in line.lower():
+            bagian = "pengeluaran"
+
+        if line.lower().startswith(nama + ":"):
+            value = jumlah if bagian != "pengeluaran" else -abs(jumlah)
+            line = line.strip() + f"{value},"
+
+        hasil.append(line)
+
+    await client.edit_message(event.chat_id, msg_target.id, "\n".join(hasil))
+    await balas_sukses(event, "BERHASIL DI TAMBAH✅")
+
+
+@client.on(events.NewMessage(pattern=r'^/tambahlist\s+'))
+async def tambahlist(event):
+    msg_target = await get_target_message(event)
+    if not msg_target:
+        return
+
+    args = event.raw_text.split()
+    if len(args) < 4:
+        return
+
+    bagian = args[1].lower()
+    nama = " ".join(args[2:-1])
+
+    try:
+        jumlah = int(args[-1])
+    except:
+        return
+
+    if bagian == "pengeluaran":
+        jumlah = -abs(jumlah)
+
+    lines = (msg_target.text or "").split("\n")
+
+    hasil = []
+    inserted = False
+
+    for line in lines:
+        hasil.append(line)
+
+        if bagian in line.lower() and not inserted:
+            hasil.append(f"{nama}:{jumlah},")
+            inserted = True
+
+    await client.edit_message(event.chat_id, msg_target.id, "\n".join(hasil))
+    await balas_sukses(event, "BERHASIL DI TAMBAHLIST✅")
+
+
+# ================= TOTAL (EDIT PESAN, BUKAN KIRIM BARU) =================
+@client.on(events.NewMessage(pattern=r'^/total'))
+async def total(event):
+    if not event.is_reply:
+        return
+
+    reply = await event.get_reply_message()
+
+    angka = re.findall(r'-?\d+', reply.text or "")
+    total = sum(map(int, angka))
+
+    lines = (reply.text or "").split("\n")
+
+    hasil = []
+    updated = False
+
+    for line in lines:
+        if "total:" in line.lower():
+            line = f"📊 TOTAL: {total}"
+            updated = True
+        hasil.append(line)
+
+    if not updated:
+        hasil.append(f"📊 TOTAL: {total}")
+
+    await client.edit_message(event.chat_id, reply.id, "\n".join(hasil))
+
+    await event.delete()
+
+
+# ================= START =================
+async def start_bot():
+    while True:
+        try:
+            print("🚀 BOT START")
+            await client.start()
+            await client.run_until_disconnected()
+        except:
+            traceback.print_exc()
+            await asyncio.sleep(5)
+
+
 if __name__ == "__main__":
-    import asyncio
-
-    asyncio.get_event_loop().run_until_complete(set_webhook())
-
-    print("FULL BOT WEBHOOK AKTIF")
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
+    Thread(target=run_web, daemon=True).start()
+    client.loop.run_until_complete(start_bot())
