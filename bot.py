@@ -142,7 +142,7 @@ async def format_hasil_kata(counts):
 @client.on(events.NewMessage(pattern=r'^/rekapkata(?:\s+(.+))?$'))
 async def rekap_hari_ini(event):
     if not event.pattern_match.group(1):
-        await event.reply("Format: /rekapkata kata1 kata2")
+        await event.reply("Format: /rekapkata text (idgrup)")
         return
 
     text = event.pattern_match.group(1)
